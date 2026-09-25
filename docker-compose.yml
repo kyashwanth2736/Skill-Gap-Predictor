@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: skill-gap-predictor
+    ports:
+      - "8080:80"
+    volumes:
+      - ./scratch/uploads:/var/www/html/scratch/uploads
+      - ./career_navigation.db:/var/www/html/career_navigation.db
+    restart: always

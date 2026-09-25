@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: skill-gap-predictor-ai
+    env: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile

@@ -1,0 +1,342 @@
+{
+  "companies": {
+    "Google": {
+      "description": "Global technology leader focusing on search, cloud computing, software, and AI.",
+      "tier": "Tier-1 Product",
+      "roles": {
+        "Software Development Engineer (SDE)": {
+          "domain": "Software Engineering",
+          "required_skills": [
+            "Data Structures",
+            "Algorithms",
+            "C++",
+            "Java",
+            "Python",
+            "System Design",
+            "Git",
+            "Problem Solving"
+          ],
+          "nice_to_have": ["Distributed Systems", "Kubernetes", "gRPC", "Docker"],
+          "experience_level": "Entry to Mid Level",
+          "min_ats_score": 75,
+          "interview_rounds": ["Coding Online Assessment", "Technical DS/Algo Round 1", "Technical DS/Algo Round 2", "Googlyness & Leadership"]
+        },
+        "Machine Learning Engineer": {
+          "domain": "Artificial Intelligence & ML",
+          "required_skills": [
+            "Python",
+            "TensorFlow",
+            "PyTorch",
+            "Scikit-Learn",
+            "Machine Learning",
+            "Deep Learning",
+            "NLP",
+            "Linear Algebra"
+          ],
+          "nice_to_have": ["MLOps", "Kubeflow", "Cloud AI", "Computer Vision"],
+          "experience_level": "Entry to Mid Level",
+          "min_ats_score": 80,
+          "interview_rounds": ["Coding Assessment", "ML Theory & Math", "ML System Design", "Behavioral"]
+        },
+        "Cloud & DevOps Engineer": {
+          "domain": "Cloud & DevOps",
+          "required_skills": [
+            "Google Cloud Platform (GCP)",
+            "Kubernetes",
+            "Docker",
+            "Terraform",
+            "Linux",
+            "CI/CD",
+            "Python",
+            "Bash Scripting"
+          ],
+          "nice_to_have": ["Prometheus", "Grafana", "Ansible", "Networking"],
+          "experience_level": "Entry to Mid Level",
+          "min_ats_score": 75,
+          "interview_rounds": ["Scripting Assessment", "Infrastructure Architecture", "Troubleshooting & Systems", "Behavioral"]
+        }
+      }
+    },
+    "Microsoft": {
+      "description": "Pioneer in operating systems, enterprise software, Azure cloud, and generative AI.",
+      "tier": "Tier-1 Product",
+      "roles": {
+        "Software Development Engineer (SDE)": {
+          "domain": "Software Engineering",
+          "required_skills": [
+            "C#",
+            ".NET",
+            "Data Structures",
+            "Algorithms",
+            "Azure",
+            "Object-Oriented Programming (OOP)",
+            "SQL",
+            "Git"
+          ],
+          "nice_to_have": ["Microservices", "CosmosDB", "React", "Docker"],
+          "experience_level": "Entry Level",
+          "min_ats_score": 75,
+          "interview_rounds": ["Codility Assessment", "Data Structures & Coding", "OOP Design & Clean Code", "HR / Cultural Fit"]
+        },
+        "Data Scientist": {
+          "domain": "Data Science & Analytics",
+          "required_skills": [
+            "Python",
+            "SQL",
+            "R",
+            "Pandas",
+            "NumPy",
+            "Statistics",
+            "Machine Learning",
+            "Power BI"
+          ],
+          "nice_to_have": ["Azure ML", "Data Warehousing", "Spark", "A/B Testing"],
+          "experience_level": "Entry Level",
+          "min_ats_score": 75,
+          "interview_rounds": ["Statistical Reasoning", "Coding & Data Wrangling", "Machine Learning Case Study", "Behavioral"]
+        }
+      }
+    },
+    "Amazon": {
+      "description": "Worldwide e-commerce and cloud infrastructure powerhouse (AWS).",
+      "tier": "Tier-1 Product",
+      "roles": {
+        "Software Development Engineer (SDE-1)": {
+          "domain": "Software Engineering",
+          "required_skills": [
+            "Java",
+            "Data Structures",
+            "Algorithms",
+            "Object-Oriented Programming (OOP)",
+            "System Design",
+            "AWS",
+            "SQL",
+            "Git"
+          ],
+          "nice_to_have": ["DynamoDB", "Spring Boot", "Distributed Caching", "Docker"],
+          "experience_level": "Entry Level",
+          "min_ats_score": 78,
+          "interview_rounds": ["Amazon OA (HackerRank)", "Coding & Problem Solving", "LLD & OOD", "Leadership Principles (LP)"]
+        },
+        "Cloud Solutions Architect": {
+          "domain": "Cloud & DevOps",
+          "required_skills": [
+            "AWS",
+            "Cloud Architecture",
+            "EC2",
+            "S3",
+            "Lambda",
+            "Networking",
+            "Linux",
+            "Python"
+          ],
+          "nice_to_have": ["Terraform", "Security Best Practices", "Cost Optimization", "Kubernetes"],
+          "experience_level": "Entry to Mid Level",
+          "min_ats_score": 75,
+          "interview_rounds": ["AWS Fundamentals", "Architecture Scenario Round", "Customer Solutions Case", "LP Round"]
+        }
+      }
+    },
+    "TCS (Tata Consultancy Services)": {
+      "description": "Global IT services, consulting, and business solutions multinational.",
+      "tier": "Tier-2 IT Services",
+      "roles": {
+        "Full Stack Developer": {
+          "domain": "Web & Full Stack",
+          "required_skills": [
+            "JavaScript",
+            "HTML5",
+            "CSS3",
+            "React",
+            "Node.js",
+            "Express.js",
+            "SQL",
+            "MongoDB"
+          ],
+          "nice_to_have": ["TypeScript", "Bootstrap", "Git", "REST APIs"],
+          "experience_level": "Entry Level (Digital/Ninja)",
+          "min_ats_score": 65,
+          "interview_rounds": ["TCS NQT (Cognitive + Technical)", "Technical Interview", "Managerial Interview", "HR Interview"]
+        },
+        "Data Analyst": {
+          "domain": "Data Science & Analytics",
+          "required_skills": [
+            "SQL",
+            "Excel",
+            "Python",
+            "Power BI",
+            "Tableau",
+            "Data Visualization",
+            "Statistics"
+          ],
+          "nice_to_have": ["Pandas", "ETL Pipelines", "Business Communication"],
+          "experience_level": "Entry Level",
+          "min_ats_score": 65,
+          "interview_rounds": ["TCS NQT", "SQL & Analytics Round", "Business Case & Presentation", "HR"]
+        }
+      }
+    },
+    "Infosys": {
+      "description": "Global leader in next-generation digital services and enterprise consulting.",
+      "tier": "Tier-2 IT Services",
+      "roles": {
+        "System Engineer / Specialist Programmer": {
+          "domain": "Software Engineering",
+          "required_skills": [
+            "Java",
+            "Python",
+            "Data Structures",
+            "Algorithms",
+            "SQL",
+            "Object-Oriented Programming (OOP)",
+            "Git"
+          ],
+          "nice_to_have": ["Spring Boot", "React", "Cloud Basics", "Docker"],
+          "experience_level": "Entry Level (InfyTQ/HackWithInfy)",
+          "min_ats_score": 68,
+          "interview_rounds": ["HackWithInfy / Online Coding Test", "Technical DS/Algo Round", "Technical Project Discussion", "HR Round"]
+        },
+        "Cybersecurity Analyst": {
+          "domain": "Cybersecurity & Networking",
+          "required_skills": [
+            "Network Security",
+            "Cybersecurity",
+            "Ethical Hacking",
+            "Linux",
+            "Firewalls",
+            "SIEM",
+            "Python",
+            "Vulnerability Assessment"
+          ],
+          "nice_to_have": ["Wireshark", "Metasploit", "SOC Operations", "CompTIA Security+"],
+          "experience_level": "Entry Level",
+          "min_ats_score": 70,
+          "interview_rounds": ["Online Assessment", "Security Scenarios & Incident Response", "Hands-on Lab Test", "HR Round"]
+        }
+      }
+    },
+    "Wipro": {
+      "description": "Leading global information technology, consulting, and business process services company.",
+      "tier": "Tier-2 IT Services",
+      "roles": {
+        "Project Engineer (Turbo / Elite)": {
+          "domain": "Software Engineering",
+          "required_skills": [
+            "Java",
+            "Python",
+            "C++",
+            "SQL",
+            "Data Structures",
+            "Web Technologies",
+            "Communication Skills"
+          ],
+          "nice_to_have": ["Spring Boot", "AWS Basics", "Git", "Problem Solving"],
+          "experience_level": "Entry Level",
+          "min_ats_score": 65,
+          "interview_rounds": ["National Talent Hunt (NTH) Test", "Technical Discussion", "HR Interview"]
+        },
+        "Cloud Support Associate": {
+          "domain": "Cloud & DevOps",
+          "required_skills": [
+            "Linux",
+            "Networking",
+            "AWS",
+            "Azure",
+            "Bash Scripting",
+            "Troubleshooting",
+            "Git"
+          ],
+          "nice_to_have": ["Docker", "Monitoring Tools", "ITIL Framework"],
+          "experience_level": "Entry Level",
+          "min_ats_score": 65,
+          "interview_rounds": ["Aptitude & Technical Assessment", "Technical Operations Round", "HR Round"]
+        }
+      }
+    },
+    "Accenture": {
+      "description": "Global professional services company with leading capabilities in digital, cloud and security.",
+      "tier": "Tier-2 Consulting & Services",
+      "roles": {
+        "Associate Software Engineer (ASE)": {
+          "domain": "Software Engineering",
+          "required_skills": [
+            "Java",
+            "Python",
+            "SQL",
+            "HTML5",
+            "CSS3",
+            "JavaScript",
+            "Problem Solving",
+            "Object-Oriented Programming (OOP)"
+          ],
+          "nice_to_have": ["Cloud Fundamentals", "Agile Methodology", "Git"],
+          "experience_level": "Entry Level",
+          "min_ats_score": 65,
+          "interview_rounds": ["Cognitive & Technical Assessment", "Coding Assessment", "Communication Assessment", "Technical + HR Interview"]
+        },
+        "Data & AI Associate": {
+          "domain": "Data Science & Analytics",
+          "required_skills": [
+            "Python",
+            "SQL",
+            "Power BI",
+            "Machine Learning",
+            "Pandas",
+            "Data Cleaning",
+            "Excel"
+          ],
+          "nice_to_have": ["Tableau", "Generative AI", "Azure Data Factory"],
+          "experience_level": "Entry Level",
+          "min_ats_score": 70,
+          "interview_rounds": ["Online Assessment", "Data Case Study Discussion", "HR Round"]
+        }
+      }
+    },
+    "Meta": {
+      "description": "Building technologies that help people connect, find communities, and grow businesses.",
+      "tier": "Tier-1 Product",
+      "roles": {
+        "Front-End Software Engineer": {
+          "domain": "Web & Full Stack",
+          "required_skills": [
+            "JavaScript",
+            "TypeScript",
+            "React",
+            "HTML5",
+            "CSS3",
+            "Web Performance",
+            "Data Structures",
+            "Git"
+          ],
+          "nice_to_have": ["GraphQL", "Next.js", "Jest", "Tailwind CSS"],
+          "experience_level": "Entry to Mid Level",
+          "min_ats_score": 80,
+          "interview_rounds": ["Technical Screen (Coding)", "Frontend Architecture", "Algorithms & Problem Solving", "Behavioral & Cultural"]
+        }
+      }
+    },
+    "IBM": {
+      "description": "Leader in hybrid cloud, quantum computing, and enterprise artificial intelligence solutions.",
+      "tier": "Tier-1 Enterprise",
+      "roles": {
+        "AI / Watson Engineer": {
+          "domain": "Artificial Intelligence & ML",
+          "required_skills": [
+            "Python",
+            "NLP",
+            "TensorFlow",
+            "PyTorch",
+            "IBM Cloud",
+            "REST APIs",
+            "Docker",
+            "SQL"
+          ],
+          "nice_to_have": ["LLMs", "LangChain", "Vector Databases", "Kubernetes"],
+          "experience_level": "Entry to Mid Level",
+          "min_ats_score": 75,
+          "interview_rounds": ["Coding & Cognitive Test", "AI Systems Architecture", "Problem Solving Discussion", "Fitment Round"]
+        }
+      }
+    }
+  }
+}

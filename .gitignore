@@ -1,0 +1,31 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# SQLite databases & temp data
+*.sqlite3
+*.db
+career_navigation.db
+
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VS Code directory (keep config, ignore local state)
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+
+# Streamlit local credentials & uploads
+.streamlit/secrets.toml
+temp_uploads/
