@@ -375,6 +375,8 @@ if ($action === 'get_metrics') {
         $metrics['strength_color'] = '#34d399';
     }
 
+    $metrics['ats_score'] = $_SESSION['ats_score'] ?? 0;
+
     echo json_encode($metrics);
     exit;
 }
@@ -448,51 +450,110 @@ if ($action === 'evaluate_answer') {
 }
 
 if ($action === 'download_pdf') {
-    $reqSkills = $_POST['required_skills'] ?? ["Python", "SQL", "Data Structures", "Algorithms", "Git"];
-    if (is_string($reqSkills)) { $reqSkills = json_decode($reqSkills, true) ?: []; }
+    $targetCompany = $_POST['target_company'] ?? ($_SESSION['user']['target_company'] ?? 'Google');
+    $targetRole = $_POST['target_role'] ?? ($_SESSION['user']['target_role'] ?? 'Software Engineer');
 
+    // Get required skills for the currently selected company and role
+    $reqSkills = $_POST['required_skills'] ?? [];
+
+    if (is_string($reqSkills)) {
+        $reqSkills = json_decode($reqSkills, true) ?: [];
+    }
+
+    // If required skills were not sent from the frontend,
+    // load them from company_roles.json using the selected company and role.
+    if (empty($reqSkills)) {
+        $jsonPath = __DIR__ . '/data/company_roles.json';
+
+        if (file_exists($jsonPath)) {
+            $benchmarkData = json_decode(file_get_contents($jsonPath), true)['companies'] ?? [];
+
+            if (isset($benchmarkData[$targetCompany]['roles'][$targetRole]['required_skills'])) {
+                $reqSkills = $benchmarkData[$targetCompany]['roles'][$targetRole]['required_skills'];
+            }
+        }
+    }
+
+    // Final fallback
+    if (empty($reqSkills)) {
+        $reqSkills = [
+            "Python",
+            "SQL",
+            "Data Structures",
+            "Algorithms",
+            "Git"
+        ];
+    }
+
+    // Calculate the latest metrics using the student's actual resume skills
+    // and the selected company/role benchmark.
     $metrics = callPythonBridge("calculate_metrics", [
         "extracted_skills" => $_SESSION['extracted_skills'] ?? [],
         "required_skills" => $reqSkills,
         "ats_score" => $_SESSION['ats_score'] ?? 72.0,
-        "target_company" => $_POST['target_company'] ?? "Google",
-        "target_role" => $_POST['target_role'] ?? "Software Engineer"
+        "target_company" => $targetCompany,
+        "target_role" => $targetRole,
+        "section_presence" => $_SESSION['parsed_resume']['section_presence'] ?? []
     ]);
 
+    if (!is_array($metrics)) {
+        $metrics = [];
+    }
+
+    // Generate roadmap using the actual missing skills.
     $roadmapRes = callPythonBridge("generate_roadmap", [
         "missing_skills" => $metrics['missing_skills'] ?? [],
-        "target_role" => $_POST['target_role'] ?? 'Software Engineer',
-        "target_company" => $_POST['target_company'] ?? 'Google'
+        "target_role" => $targetRole,
+        "target_company" => $targetCompany
     ]);
 
+    // Generate the final PDF report.
     $pdfRes = callPythonBridge("generate_pdf", [
         "student_name" => $current_user['name'],
-        "target_role" => $_POST['target_role'] ?? 'Software Engineer',
-        "target_company" => $_POST['target_company'] ?? 'Google',
+        "target_role" => $targetRole,
+        "target_company" => $targetCompany,
         "domain" => $metrics['detected_domain'] ?? 'Software Engineering',
+
         "ats_score" => $_SESSION['ats_score'] ?? 72.0,
         "readiness_score" => $metrics['readiness_pct'] ?? 70.0,
         "confidence_score" => $metrics['confidence_pct'] ?? 80.0,
         "resume_strength" => $metrics['strength_label'] ?? 'Strong',
+
         "matched_skills" => $metrics['matched_skills'] ?? [],
         "missing_skills" => $metrics['missing_skills'] ?? [],
+
         "recommendations" => [
-            !empty($metrics['missing_skills']) ? "Prioritize mastering " . $metrics['missing_skills'][0] . " and build a portfolio project." : "Maintain current proficiency.",
-            "Tailor resume summary to " . ($_POST['target_company'] ?? 'Google') . "'s core values.",
+            !empty($metrics['missing_skills'])
+                ? "Prioritize mastering " . $metrics['missing_skills'][0] . " and build a portfolio project."
+                : "Maintain current proficiency.",
+
+            "Tailor resume summary to " . $targetCompany . "'s core values.",
+
             "Include quantifiable metrics in project bullet points."
         ],
+
         "roadmap_phases" => $roadmapRes['roadmap']['phases'] ?? []
     ]);
 
     if (!empty($pdfRes['pdf_b64'])) {
         $pdfData = base64_decode($pdfRes['pdf_b64']);
+
         header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="Progress_Report_' . str_replace(' ', '_', $current_user['name']) . '.pdf"');
+        header(
+            'Content-Disposition: attachment; filename="Progress_Report_' .
+            str_replace(' ', '_', $current_user['name']) .
+            '.pdf"'
+        );
         header('Content-Length: ' . strlen($pdfData));
+
         echo $pdfData;
     } else {
-        echo json_encode(["status" => "error", "message" => "PDF Generation failed."]);
+        echo json_encode([
+            "status" => "error",
+            "message" => "PDF Generation failed."
+        ]);
     }
+
     exit;
 }
 
