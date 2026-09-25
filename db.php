@@ -5,7 +5,7 @@
  * IEEE CS Bangalore Chapter | GITAM University, Bengaluru Campus
  */
 
-define('DB_PATH', __DIR__ . '/career_navigation.db');
+define('DB_PATH', '/tmp/career_navigation.db');
 
 function hashPassword($password) {
     $salt = "ieee_p19_gitam_2026";
@@ -70,14 +70,53 @@ function initDatabase() {
     // Seed default team members if empty
     $stmt = $pdo->query("SELECT COUNT(*) as count FROM students");
     $row = $stmt->fetch();
+
     if ($row['count'] == 0) {
         $defaultHash = hashPassword("123456");
-        $seedStmt = $pdo->prepare("INSERT INTO students (name, email, password_hash, university, branch, graduation_year, target_role, target_company, linkedin, github) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+        $seedStmt = $pdo->prepare(
+            "INSERT INTO students 
+            (name, email, password_hash, university, branch, graduation_year, target_role, target_company, linkedin, github) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        );
         
         $profiles = [
-            ["Mahesh B K", "mahesh.bk@gitam.in", $defaultHash, "GITAM University, Bengaluru", "Computer Science & Engineering", 2026, "Software Development Engineer (SDE)", "Google", "linkedin.com/in/maheshbk", "github.com/maheshbk"],
-            ["Vinay Kumar S", "vinay.kumar@gitam.in", $defaultHash, "GITAM University, Bengaluru", "Computer Science & Engineering", 2026, "Full Stack Developer", "Microsoft", "linkedin.com/in/vinaykumars", "github.com/vinaykumars"],
-            ["Yashwanth K", "yashwanth.k@gitam.in", $defaultHash, "GITAM University, Bengaluru", "Computer Science & Engineering", 2026, "Data Scientist", "Amazon", "linkedin.com/in/yashwanthk", "github.com/yashwanthk"],
+            [
+                "Mahesh B K",
+                "mahesh.bk@gitam.in",
+                $defaultHash,
+                "GITAM University, Bengaluru",
+                "Computer Science & Engineering",
+                2026,
+                "Software Development Engineer (SDE)",
+                "Google",
+                "linkedin.com/in/maheshbk",
+                "github.com/maheshbk"
+            ],
+            [
+                "Vinay Kumar S",
+                "vinay.kumar@gitam.in",
+                $defaultHash,
+                "GITAM University, Bengaluru",
+                "Computer Science & Engineering",
+                2026,
+                "Full Stack Developer",
+                "Microsoft",
+                "linkedin.com/in/vinaykumars",
+                "github.com/vinaykumars"
+            ],
+            [
+                "Yashwanth K",
+                "yashwanth.k@gitam.in",
+                $defaultHash,
+                "GITAM University, Bengaluru",
+                "Computer Science & Engineering",
+                2026,
+                "Data Scientist",
+                "Amazon",
+                "linkedin.com/in/yashwanthk",
+                "github.com/yashwanthk"
+            ],
         ];
 
         foreach ($profiles as $p) {
@@ -86,86 +125,208 @@ function initDatabase() {
     }
 }
 
-function registerUser($name, $email, $password, $university = "GITAM University, Bengaluru", $branch = "Computer Science & Engineering", $graduation_year = 2026, $target_company = "Google", $target_role = "Software Development Engineer (SDE)", $linkedin = "", $github = "") {
+function registerUser(
+    $name,
+    $email,
+    $password,
+    $university = "GITAM University, Bengaluru",
+    $branch = "Computer Science & Engineering",
+    $graduation_year = 2026,
+    $target_company = "Google",
+    $target_role = "Software Development Engineer (SDE)",
+    $linkedin = "",
+    $github = ""
+) {
     $name = trim($name);
     $email = strtolower(trim($email));
 
     if (empty($name) || empty($email) || empty($password)) {
-        return ["success" => false, "message" => "Name, email, and password cannot be empty."];
+        return [
+            "success" => false,
+            "message" => "Name, email, and password cannot be empty."
+        ];
     }
 
     if (strlen($password) < 4) {
-        return ["success" => false, "message" => "Password must be at least 4 characters long."];
+        return [
+            "success" => false,
+            "message" => "Password must be at least 4 characters long."
+        ];
     }
 
     $pdo = getDBConnection();
+
     $stmt = $pdo->prepare("SELECT id FROM students WHERE email = ?");
     $stmt->execute([$email]);
+
     if ($stmt->fetch()) {
-        return ["success" => false, "message" => "An account with this email address already exists. Please log in."];
+        return [
+            "success" => false,
+            "message" => "An account with this email address already exists. Please log in."
+        ];
     }
 
     $pwdHash = hashPassword($password);
-    $insertStmt = $pdo->prepare("INSERT INTO students (name, email, password_hash, university, branch, graduation_year, target_role, target_company, linkedin, github) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+    $insertStmt = $pdo->prepare(
+        "INSERT INTO students 
+        (name, email, password_hash, university, branch, graduation_year, target_role, target_company, linkedin, github) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+
     try {
-        $insertStmt->execute([$name, $email, $pwdHash, $university, $branch, (int)$graduation_year, $target_role, $target_company, $linkedin, $github]);
+        $insertStmt->execute([
+            $name,
+            $email,
+            $pwdHash,
+            $university,
+            $branch,
+            (int)$graduation_year,
+            $target_role,
+            $target_company,
+            $linkedin,
+            $github
+        ]);
+
         $userId = $pdo->lastInsertId();
-        return ["success" => true, "message" => "Account created successfully! You can now log in.", "user_id" => $userId];
+
+        return [
+            "success" => true,
+            "message" => "Account created successfully! You can now log in.",
+            "user_id" => $userId
+        ];
+
     } catch (Exception $e) {
-        return ["success" => false, "message" => "Registration error: " . $e->getMessage()];
+        return [
+            "success" => false,
+            "message" => "Registration error: " . $e->getMessage()
+        ];
     }
 }
 
 function authenticateUser($email, $password) {
     $email = strtolower(trim($email));
+
     if (empty($email) || empty($password)) {
-        return ["success" => false, "message" => "Please enter both email and password."];
+        return [
+            "success" => false,
+            "message" => "Please enter both email and password."
+        ];
     }
 
     $pdo = getDBConnection();
+
     $stmt = $pdo->prepare("SELECT * FROM students WHERE email = ?");
     $stmt->execute([$email]);
+
     $user = $stmt->fetch();
 
     if (!$user) {
-        return ["success" => false, "message" => "No student profile found with this email. Please sign up."];
+        return [
+            "success" => false,
+            "message" => "No student profile found with this email. Please sign up."
+        ];
     }
 
     $pwdHash = hashPassword($password);
+
     if ($user['password_hash'] !== $pwdHash) {
-        return ["success" => false, "message" => "Incorrect password. Please verify your credentials."];
+        return [
+            "success" => false,
+            "message" => "Incorrect password. Please verify your credentials."
+        ];
     }
 
     unset($user['password_hash']);
-    return ["success" => true, "message" => "Login successful.", "user" => $user];
+
+    return [
+        "success" => true,
+        "message" => "Login successful.",
+        "user" => $user
+    ];
 }
 
 function getStudentById($student_id) {
     $pdo = getDBConnection();
+
     $stmt = $pdo->prepare("SELECT * FROM students WHERE id = ?");
     $stmt->execute([$student_id]);
+
     $user = $stmt->fetch();
+
     if ($user) {
         unset($user['password_hash']);
         return $user;
     }
+
     return null;
 }
 
-function updateStudentProfile($student_id, $name, $university, $branch, $graduation_year, $target_role, $target_company, $linkedin = '', $github = '') {
+function updateStudentProfile(
+    $student_id,
+    $name,
+    $university,
+    $branch,
+    $graduation_year,
+    $target_role,
+    $target_company,
+    $linkedin = '',
+    $github = ''
+) {
     $pdo = getDBConnection();
-    $stmt = $pdo->prepare("UPDATE students SET name = ?, university = ?, branch = ?, graduation_year = ?, target_role = ?, target_company = ?, linkedin = ?, github = ? WHERE id = ?");
+
+    $stmt = $pdo->prepare(
+        "UPDATE students 
+        SET name = ?, 
+            university = ?, 
+            branch = ?, 
+            graduation_year = ?, 
+            target_role = ?, 
+            target_company = ?, 
+            linkedin = ?, 
+            github = ? 
+        WHERE id = ?"
+    );
+
     try {
-        $stmt->execute([$name, $university, $branch, (int)$graduation_year, $target_role, $target_company, $linkedin, $github, $student_id]);
+        $stmt->execute([
+            $name,
+            $university,
+            $branch,
+            (int)$graduation_year,
+            $target_role,
+            $target_company,
+            $linkedin,
+            $github,
+            $student_id
+        ]);
+
         return true;
+
     } catch (Exception $e) {
         return false;
     }
 }
 
-function saveResumeEvaluation($student_id, $file_name, $domain, $ats_score, $readiness_score, $confidence_score, $matched_skills, $missing_skills, $recommendations) {
+function saveResumeEvaluation(
+    $student_id,
+    $file_name,
+    $domain,
+    $ats_score,
+    $readiness_score,
+    $confidence_score,
+    $matched_skills,
+    $missing_skills,
+    $recommendations
+) {
     $pdo = getDBConnection();
-    $stmt = $pdo->prepare("INSERT INTO resume_history (student_id, file_name, domain, ats_score, readiness_score, confidence_score, matched_skills, missing_skills, recommendations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+    $stmt = $pdo->prepare(
+        "INSERT INTO resume_history 
+        (student_id, file_name, domain, ats_score, readiness_score, confidence_score, matched_skills, missing_skills, recommendations) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+
     $stmt->execute([
         $student_id,
         $file_name,
@@ -177,22 +338,44 @@ function saveResumeEvaluation($student_id, $file_name, $domain, $ats_score, $rea
         json_encode($missing_skills),
         json_encode($recommendations)
     ]);
+
     return $pdo->lastInsertId();
 }
 
 function getResumeHistoryForStudent($student_id) {
     $pdo = getDBConnection();
-    $stmt = $pdo->prepare("SELECT * FROM resume_history WHERE student_id = ? ORDER BY created_at DESC");
+
+    $stmt = $pdo->prepare(
+        "SELECT * FROM resume_history 
+        WHERE student_id = ? 
+        ORDER BY created_at DESC"
+    );
+
     $stmt->execute([$student_id]);
+
     $rows = $stmt->fetchAll();
 
     $history = [];
+
     foreach ($rows as $row) {
-        $row['matched_skills'] = json_decode($row['matched_skills'], true) ?: [];
-        $row['missing_skills'] = json_decode($row['missing_skills'], true) ?: [];
-        $row['recommendations'] = json_decode($row['recommendations'], true) ?: [];
+        $row['matched_skills'] = json_decode(
+            $row['matched_skills'],
+            true
+        ) ?: [];
+
+        $row['missing_skills'] = json_decode(
+            $row['missing_skills'],
+            true
+        ) ?: [];
+
+        $row['recommendations'] = json_decode(
+            $row['recommendations'],
+            true
+        ) ?: [];
+
         $history[] = $row;
     }
+
     return $history;
 }
 
