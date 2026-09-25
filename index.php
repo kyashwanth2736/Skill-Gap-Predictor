@@ -68,15 +68,15 @@ function formatSocialUrl($url) {
         <div id="form-login-box">
             <div id="login-error-msg" class="alert alert-error" style="display: none;"></div>
             <div class="form-group">
-                <label class="form-label">University / Student Email</label>
-                <input type="email" id="login_email" class="form-control" placeholder="e.g. mahesh.bk@gitam.in" value="mahesh.bk@gitam.in">
+                <label class="form-label">Email</label>
+                <input type="email" id="login_email" class="form-control" placeholder="Enter registered email" autocomplete="username">
             </div>
             <div class="form-group">
                 <label class="form-label">Password</label>
-                <input type="password" id="login_password" class="form-control" placeholder="Password" value="123456">
+                <input type="password" id="login_password" class="form-control" placeholder="Password" autocomplete="current-password">
+                <button type="button" class="password-toggle-btn" id="toggle-login-password" aria-label="Toggle Password Visibility">👁️</button>
             </div>
-            <button id="btn-do-login" class="btn btn-block">🚀 Log In to My Dashboard</button>
-            <p style="font-size: 12px; color: var(--text-subtle); margin-top: 14px; text-align: center;">Default Test Account: <code>mahesh.bk@gitam.in</code> / Password: <code>123456</code></p>
+            <button id="btn-do-login" class="btn btn-block">Log In</button>
         </div>
 
         <!-- Signup Form -->
@@ -85,35 +85,49 @@ function formatSocialUrl($url) {
             <div id="signup-success-msg" class="alert alert-success" style="display: none;"></div>
             <div class="form-group">
                 <label class="form-label">Full Name</label>
-                <input type="text" id="signup_name" class="form-control" placeholder="e.g. Kiran Kumar">
+                <input type="text" id="signup_name" class="form-control" placeholder="Enter your full name">
             </div>
             <div class="form-group">
                 <label class="form-label">Email Address</label>
-                <input type="email" id="signup_email" class="form-control" placeholder="e.g. kiran@gitam.in">
+                <input type="email" id="signup_email" class="form-control" placeholder="Enter your email address">
             </div>
             <div class="form-group">
                 <label class="form-label">Create Password</label>
-                <input type="password" id="signup_pwd" class="form-control" placeholder="At least 4 chars">
+                <input type="password" id="signup_pwd" class="form-control" placeholder="Min 8 chars, uppercase, lowercase, number & special character" minlength="8" required>
+                <button type="button" class="password-toggle-btn" id="toggle-signup-password" aria-label="Toggle Password Visibility">👁️</button>
+                <small style="color: var(--text-muted); font-size: 12px;">Password must contain at least 8 characters, including uppercase, lowercase, number, and special character.</small>
             </div>
             <div class="form-group">
                 <label class="form-label">University / College</label>
-                <input type="text" id="signup_uni" class="form-control" value="GITAM University, Bengaluru">
+                <input type="text" id="signup_uni" class="form-control" placeholder="Enter your university or college name">
             </div>
             <div class="form-group">
-                <label class="form-label">Branch / Degree</label>
-                <input type="text" id="signup_branch" class="form-control" value="Computer Science & Engineering">
+                <label class="form-label">Degree</label>
+                <input type="text" id="signup_branch" class="form-control" placeholder="e.g B.TECH/B.E">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Branch</label>
+                <input type="text" id="signup_major" class="form-control" placeholder="e.g Computer Science, ECE, IT">
             </div>
             <div class="form-group">
                 <label class="form-label">Graduation Year</label>
-                <select id="signup_year" class="form-control">
-                    <option value="2024">2024</option>
-                    <option value="2025">2025</option>
-                    <option value="2026" selected>2026</option>
-                    <option value="2027">2027</option>
-                    <option value="2028">2028</option>
-                </select>
+                <input type="number" id="signup_gradyear" class="form-control" placeholder="e.g 2025" min="2020" max="2030">
             </div>
-            <button id="btn-do-signup" class="btn btn-block">✨ Register Account</button>
+            <div class="form-group">
+                <label class="form-label">LinkedIn Profile (Optional)</label>
+                <input type="text" id="signup_linkedin" class="form-control" placeholder="https://www.linkedin.com/in/yourprofile">
+            </div>
+            <div class="form-group">
+                <label class="form-label">GitHub Profile (Optional)</label>
+                <input type="text" id="signup_github" class="form-control" placeholder="https://github.com/yourprofile">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Current Skills (Comma Separated)</label>
+                <input type="text" id="signup_skills" class="form-control" placeholder="e.g Python, SQL, Data Structures, Git">
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+                <label class="form-label">By signing up, you agree to our <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a>.</label>
+            <button id="btn-do-signup" class="btn btn-block" type="submit">Register Account</button>
         </div>
     </div>
 </div>
@@ -123,7 +137,25 @@ function formatSocialUrl($url) {
 <!-- LOGGED IN USER APPLICATION DASHBOARD -->
 <!-- ============================================================= -->
 <div class="app-container">
-    <!-- Sidebar -->
+
+    <!-- Mobile Header -->
+    <div class="mobile-topbar">
+        <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Open Menu">
+            ☰
+        </button>
+
+        <div class="mobile-title">
+            Skill-Gap Predictor
+        </div>
+
+        <button id="theme-toggle-mobile" class="theme-toggle" aria-label="Toggle Theme">
+            🌙
+        </button>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
     <aside class="sidebar">
         <div class="sidebar-user-card">
             <div style="font-size: 26px; margin-bottom: 4px;">👤</div>
@@ -162,9 +194,9 @@ function formatSocialUrl($url) {
 
             <div id="box-custom-select" style="display: none;">
                 <label class="form-label">Company Name:</label>
-                <input type="text" id="input-custom-company" class="form-control" value="Zoho" style="margin-bottom: 8px;">
+                <input type="text" id="input-custom-company" class="form-control" placeholder="Enter company name" style="margin-bottom: 8px;">
                 <label class="form-label">Role Name:</label>
-                <input type="text" id="input-custom-role" class="form-control" value="Backend Engineer" style="margin-bottom: 8px;">
+                <input type="text" id="input-custom-role" class="form-control" placeholder="Enter role name" style="margin-bottom: 8px;">
                 <label class="form-label">Required Skills:</label>
                 <div style="max-height: 120px; overflow-y: auto; background: rgba(15, 23, 42, 0.9); padding: 8px; border-radius: 6px; font-size: 12px;">
                     <?php foreach (array_slice($canonicalSkills, 0, 10) as $sk): ?>
@@ -191,7 +223,7 @@ function formatSocialUrl($url) {
         <!-- Top Banner -->
         <div class="main-header-banner">
             <span class="student-badge">⚡ Career Navigation AI — <?php echo htmlspecialchars($user['name']); ?></span>
-            <h1 class="header-title" id="banner-company-role">Google · Software Development Engineer (SDE)</h1>
+            <h1 class="header-title" id="banner-company-role"><?php echo htmlspecialchars($user['company'] ?? 'Company') ?> · <?php echo htmlspecialchars($user['role'] ?? 'Role') ?></h1>
             <p class="header-subtitle">
                 Evaluating student skills, ATS compatibility, and placement readiness in real time.
             </p>
@@ -204,23 +236,29 @@ function formatSocialUrl($url) {
             <div class="metrics-grid">
                 <div class="metric-card-container">
                     <span class="metric-label">ATS Score</span>
-                    <span class="metric-value" style="color: var(--cyan-light);" id="metric-ats"><?php echo $_SESSION['ats_score'] ?? 72.0; ?> / 100</span>
+                    <span class="metric-value" style="color: var(--cyan-light);" id="metric-ats"><?php echo htmlspecialchars($_SESSION['ats_score'] ?? 0); ?> / 100</span>
                     <span class="metric-subtext">Target Min: 70/100</span>
                 </div>
                 <div class="metric-card-container">
                     <span class="metric-label">Job Readiness</span>
-                    <span class="metric-value" style="color: var(--emerald);" id="metric-readiness">65%</span>
-                    <span class="metric-subtext" id="metric-matched-count">5 of 8 Skills Matched</span>
+                    <span class="metric-value" style="color: var(--emerald);" id="metric-readiness"><?php echo htmlspecialchars($_SESSION['readiness_score'] ?? 0); ?>%</span>
+                    <span class="metric-subtext" id="metric-readiness-subtext">Based on Skill Match</span>
+                    <span class="metric-subtext" id="metric-matched-count"><?php 
+                        $matched = $_SESSION['matched_skills_count'] ?? [];
+                        $missing = $_SESSION['missing_skills'] ?? [];
+                        $totalSkills = count($matched) + count($missing);
+                        echo count($matched) . " of " . $totalSkills . " Skills Matched";
+                    ?></span>
                 </div>
                 <div class="metric-card-container">
                     <span class="metric-label">AI Confidence</span>
-                    <span class="metric-value" style="color: var(--purple);" id="metric-confidence">82%</span>
+                    <span class="metric-value" style="color: var(--purple);" id="metric-confidence"><?php echo htmlspecialchars($_SESSION['confidence_score'] ?? 0); ?>%</span>
                     <span class="metric-subtext">Prediction Reliability</span>
                 </div>
                 <div class="metric-card-container">
                     <span class="metric-label">Resume Strength</span>
-                    <span class="metric-value" style="color: var(--emerald);" id="metric-strength">Strong</span>
-                    <span class="metric-subtext">Shortlisting Probability</span>
+                    <span class="metric-value" style="color: var(--emerald);" id="metric-strength"><?php echo htmlspecialchars($_SESSION['resume_strength'] ?? 'Not Evaluated'); ?></span>
+                    <span class="metric-subtext">Resume Evaluation</span>
                 </div>
             </div>
 
@@ -271,7 +309,7 @@ function formatSocialUrl($url) {
                     <form id="form-resume-upload" enctype="multipart/form-data">
                         <div class="form-group">
                             <label class="form-label">Upload Resume (PDF / DOCX)</label>
-                            <input type="file" id="input-resume-file" accept=".pdf,.docx,.txt" class="form-control">
+                            <input type="file" id="input-resume-file" accept=".pdf,.docx" class="form-control">
                         </div>
                         <button type="submit" class="btn btn-block">🚀 Evaluate Resume ATS</button>
                     </form>
@@ -329,7 +367,7 @@ function formatSocialUrl($url) {
             <div class="section-panel">
                 <h4 style="margin-bottom: 12px; color: var(--cyan-light);">Role Readiness Match</h4>
                 <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" style="width: 65%;"></div>
+                    <div id="skillgap-progress-bar" class="progress-bar-fill" style="width: <?php echo htmlspecialchars($_SESSION['readiness_score'] ?? 0); ?>%;"></div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
@@ -379,7 +417,7 @@ function formatSocialUrl($url) {
                         <td><strong>Google</strong></td>
                         <td>Software Development Engineer (SDE)</td>
                         <td>Software Engineering</td>
-                        <td><strong style="color: var(--cyan-light);">75%</strong></td>
+                        <td><strong style="color: var(--cyan-light);"><?php echo htmlspecialchars($_SESSION['readiness_score'] ?? '0%'); ?></strong></td>
                         <td>6 / 8</td>
                         <td><span style="color: var(--emerald); font-weight:700;">High Match</span></td>
                         <td>System Design, C++</td>
@@ -390,7 +428,7 @@ function formatSocialUrl($url) {
             <div class="section-panel" style="margin-top: 32px;">
                 <h4 style="color: var(--cyan-light); margin-bottom: 12px;">🌐 Automatic Web Retrieval (AWR) — Live Job Posting URL Scraper</h4>
                 <div style="display: flex; gap: 14px;">
-                    <input type="text" id="input-scrape-url" class="form-control" placeholder="https://careers.google.com/jobs/results/...">
+                    <input type="text" id="input-scrape-url" class="form-control" placeholder="Enter job posting URL" style="flex: 1;">
                     <button id="btn-scrape-url" class="btn" style="white-space: nowrap;">Fetch & Analyze URL</button>
                 </div>
                 <div id="scrape-results-box" style="display: none; margin-top: 14px;"></div>
@@ -543,13 +581,13 @@ function formatSocialUrl($url) {
         <!-- VIEW 7: DOWNLOAD PROGRESS REPORT -->
         <!-- ============================================================= -->
         <section id="view-report" class="view-panel" style="display: none;">
-            <h3>📑 Student Progress Report Generator</h3>
+            <h3>Student Progress Report Generator</h3>
             <p style="color: var(--text-muted); margin-bottom: 24px;">Generate and download a publication-grade PDF report containing scores, skill gap analysis, and review details.</p>
 
             <form action="api.php?action=download_pdf" method="POST" target="_blank">
-                <input type="hidden" name="target_company" value="Google">
-                <input type="hidden" name="target_role" value="Software Development Engineer (SDE)">
-                <button type="submit" class="btn" style="padding: 14px 28px; font-size: 16px;">📥 Download Progress Report (PDF)</button>
+                <input type="hidden" name="target_company" id="input-report-company" value="<?php echo htmlspecialchars($_SESSION['target_company'] ?? ''); ?>">
+                <input type="hidden" name="target_role" id="report-target-role" value="<?php echo htmlspecialchars($_SESSION['target_role'] ?? ''); ?>">
+                <button type="submit" class="btn" style="padding: 14px 28px; font-size: 16px;">Download Progress Report (PDF)</button>
             </form>
         </section>
 
@@ -583,6 +621,18 @@ function formatSocialUrl($url) {
                             <input type="text" name="university" class="form-control" value="<?php echo htmlspecialchars($user['university']); ?>">
                         </div>
                         <div class="form-group">
+                            <label class="form-label">Email Address</label>
+                            <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($user['email']); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Phone Number</label>
+                            <input type="text" name="phone" class="form-control" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Degree</label>
+                            <input type="text" name="degree" class="form-control" value="<?php echo htmlspecialchars($user['degree'] ?? ''); ?>">
+                        </div>
+                        <div class="form-group">
                             <label class="form-label">Branch</label>
                             <input type="text" name="branch" class="form-control" value="<?php echo htmlspecialchars($user['branch']); ?>">
                         </div>
@@ -603,7 +653,7 @@ function formatSocialUrl($url) {
                 </div>
             </div>
 
-            <h4 style="color: var(--cyan-light); margin-bottom: 14px;">📜 Resume Version History</h4>
+            <h4 style="color: var(--cyan-light); margin-bottom: 14px;">Resume Version History</h4>
             <?php 
             $history = getResumeHistoryForStudent($user['id']);
             if (!empty($history)):
