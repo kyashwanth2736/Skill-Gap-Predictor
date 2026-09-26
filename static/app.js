@@ -1,44 +1,20 @@
 (() => {
     "use strict";
 
-    /* ============================================================
-       SKILL GAP PREDICTOR
-       MAIN FRONTEND JAVASCRIPT
-       ============================================================ */
-
     const APP = window.APP_DATA || {};
 
     const state = {
         loggedIn: Boolean(APP.loggedIn),
         user: APP.user || null,
-
         careerUrl: APP.careerUrl || "",
-
-        careerJobs: Array.isArray(APP.careerJobs)
-            ? APP.careerJobs
-            : [],
-
-        extractedSkills: Array.isArray(APP.extractedSkills)
-            ? APP.extractedSkills
-            : [],
-
-        requiredSkills: Array.isArray(APP.requiredSkills)
-            ? APP.requiredSkills
-            : [],
-
+        careerJobs: Array.isArray(APP.careerJobs) ? APP.careerJobs : [],
+        extractedSkills: Array.isArray(APP.extractedSkills) ? APP.extractedSkills : [],
+        requiredSkills: Array.isArray(APP.requiredSkills) ? APP.requiredSkills : [],
         atsScore: Number(APP.atsScore || 0),
-
         targetCompany: APP.targetCompany || "",
-
         targetRole: APP.targetRole || "",
-
         recommendedJob: APP.recommendedJob || null
     };
-
-
-    /* ============================================================
-       BASIC HELPERS
-       ============================================================ */
 
     function $(id) {
         return document.getElementById(id);
@@ -52,16 +28,8 @@
         return Array.from(parent.querySelectorAll(selector));
     }
 
-    function text(value) {
-        if (value === null || value === undefined) {
-            return "";
-        }
-
-        return String(value);
-    }
-
     function escapeHtml(value) {
-        return text(value)
+        return String(value ?? "")
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
@@ -69,16 +37,8 @@
             .replace(/'/g, "&#039;");
     }
 
-
-    /* ============================================================
-       SKILL NORMALIZATION
-       ============================================================ */
-
     function normalizeSkill(skill) {
-
-        if (skill === null || skill === undefined) {
-            return "";
-        }
+        if (skill === null || skill === undefined) return "";
 
         return String(skill)
             .toLowerCase()
@@ -87,17 +47,12 @@
             .trim();
     }
 
-
     function normalizeSkills(skills) {
+        if (!Array.isArray(skills)) return [];
 
-        if (!Array.isArray(skills)) {
-            return [];
-        }
-
-        const output = [];
+        const result = [];
 
         skills.forEach(item => {
-
             let value = "";
 
             if (typeof item === "string") {
@@ -113,74 +68,42 @@
 
             value = String(value).trim();
 
-            if (!value) {
-                return;
-            }
+            if (!value) return;
 
             const normalized = normalizeSkill(value);
 
-            const exists = output.some(
-                existing =>
-                    normalizeSkill(existing) === normalized
-            );
-
-            if (!exists) {
-                output.push(value);
+            if (
+                !result.some(
+                    x => normalizeSkill(x) === normalized
+                )
+            ) {
+                result.push(value);
             }
         });
 
-        return output;
+        return result;
     }
-
-
-    /* ============================================================
-       MESSAGES
-       ============================================================ */
 
     function showMessage(element, message, type = "info") {
-
-        if (!element) {
-            return;
-        }
+        if (!element) return;
 
         element.textContent = message || "";
-
-        element.className =
-            "form-message " + type;
-
-        element.style.display =
-            message ? "block" : "none";
+        element.className = "form-message " + type;
+        element.style.display = message ? "block" : "none";
     }
 
-
-    /* ============================================================
-       BUTTON LOADING
-       ============================================================ */
-
-    function setButtonLoading(
-        button,
-        loading,
-        normalText
-    ) {
-
-        if (!button) {
-            return;
-        }
+    function setButtonLoading(button, loading, normalText) {
+        if (!button) return;
 
         if (loading) {
-
             if (!button.dataset.originalText) {
-                button.dataset.originalText =
-                    button.textContent;
+                button.dataset.originalText = button.textContent;
             }
 
             button.disabled = true;
             button.textContent = "Loading...";
-
         } else {
-
             button.disabled = false;
-
             button.textContent =
                 button.dataset.originalText ||
                 normalText ||
@@ -190,13 +113,7 @@
         }
     }
 
-
-    /* ============================================================
-       LOADING SCREEN
-       ============================================================ */
-
     function hideLoadingScreen() {
-
         const selectors = [
             "#loading-screen",
             "#app-loading",
@@ -208,62 +125,46 @@
         ];
 
         selectors.forEach(selector => {
-
             qsa(selector).forEach(element => {
-
                 element.style.opacity = "0";
                 element.style.visibility = "hidden";
                 element.style.pointerEvents = "none";
-
-                setTimeout(() => {
-                    element.style.display = "none";
-                }, 200);
-
+                element.style.display = "none";
             });
-
         });
 
-
-        /*
-         * Extra protection for the exact loading text.
-         */
-
         qsa("body *").forEach(element => {
-
             if (
                 element.children.length === 0 &&
                 element.textContent &&
                 element.textContent.trim() ===
-                "Loading Skill-Gap Predictor ..."
+                    "Loading Skill-Gap Predictor ..."
             ) {
-
                 let parent = element;
 
                 for (
                     let i = 0;
-                    i < 4 &&
-                    parent.parentElement;
+                    i < 5 && parent.parentElement;
                     i++
                 ) {
-
                     parent = parent.parentElement;
 
                     const style =
-                        window.getComputedStyle(
-                            parent
-                        );
+                        window.getComputedStyle(parent);
 
                     if (
                         style.position === "fixed" ||
                         style.position === "absolute" ||
-                        (parent.id &&
-                         parent.id.toLowerCase().includes("load"))
+                        (
+                            parent.id &&
+                            parent.id
+                                .toLowerCase()
+                                .includes("load")
+                        )
                     ) {
-
                         parent.style.display = "none";
                         parent.style.visibility = "hidden";
                         parent.style.pointerEvents = "none";
-
                         break;
                     }
                 }
@@ -271,97 +172,50 @@
         });
     }
 
+    window.addEventListener("load", hideLoadingScreen);
 
-    /*
-     * Do not allow a broken JavaScript function to keep
-     * the application stuck on the loading screen.
-     */
-
-    window.addEventListener(
-        "load",
-        hideLoadingScreen
-    );
-
-    window.addEventListener(
-        "error",
-        () => {
-            hideLoadingScreen();
-        }
-    );
+    window.addEventListener("error", function () {
+        hideLoadingScreen();
+    });
 
     window.addEventListener(
         "unhandledrejection",
-        () => {
+        function () {
             hideLoadingScreen();
         }
     );
 
+    async function apiRequest(action, data = {}, timeout = 60000) {
+        const controller = new AbortController();
 
-    /* ============================================================
-       API REQUEST
-       ============================================================ */
-
-    async function apiRequest(
-        action,
-        data = {},
-        timeout = 60000
-    ) {
-
-        const controller =
-            new AbortController();
-
-        const timeoutId =
-            setTimeout(
-                () => controller.abort(),
-                timeout
-            );
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+        }, timeout);
 
         try {
+            const formData = new FormData();
 
-            const formData =
-                new FormData();
-
-            formData.append(
-                "action",
-                action
-            );
-
+            formData.append("action", action);
 
             Object.keys(data).forEach(key => {
-
                 const value = data[key];
 
                 if (
                     value === null ||
                     value === undefined
                 ) {
-
-                    formData.append(
-                        key,
-                        ""
-                    );
-
-                } else if (
-                    value instanceof File
-                ) {
-
-                    formData.append(
-                        key,
-                        value
-                    );
-
+                    formData.append(key, "");
+                } else if (value instanceof File) {
+                    formData.append(key, value);
                 } else if (
                     Array.isArray(value) ||
                     typeof value === "object"
                 ) {
-
                     formData.append(
                         key,
                         JSON.stringify(value)
                     );
-
                 } else {
-
                     formData.append(
                         key,
                         String(value)
@@ -369,135 +223,91 @@
                 }
             });
 
-
-            const response =
-                await fetch(
-                    "api.php?action=" +
+            const response = await fetch(
+                "api.php?action=" +
                     encodeURIComponent(action),
-                    {
-                        method: "POST",
-                        body: formData,
-                        credentials: "same-origin",
-                        cache: "no-store",
-                        signal: controller.signal
-                    }
-                );
+                {
+                    method: "POST",
+                    body: formData,
+                    credentials: "same-origin",
+                    cache: "no-store",
+                    signal: controller.signal
+                }
+            );
 
-
-            const raw =
-                await response.text();
-
+            const raw = await response.text();
 
             let result;
 
             try {
-
-                result =
-                    JSON.parse(raw);
-
+                result = JSON.parse(raw);
             } catch (error) {
-
                 console.error(
                     "Invalid API response:",
                     raw
                 );
 
                 throw new Error(
-                    "Server returned an invalid response. Check api.php."
+                    "Server returned an invalid response. Please check api.php."
                 );
             }
-
 
             if (!response.ok) {
-
                 throw new Error(
                     result.message ||
-                    result.error ||
-                    "Server request failed."
+                        result.error ||
+                        "Server request failed."
                 );
             }
-
 
             if (result.success === false) {
-
                 throw new Error(
                     result.message ||
-                    result.error ||
-                    "Request failed."
+                        result.error ||
+                        "Request failed."
                 );
             }
 
-
             return result;
-
         } catch (error) {
-
-            if (
-                error.name ===
-                "AbortError"
-            ) {
-
+            if (error.name === "AbortError") {
                 throw new Error(
                     "Request timed out. Please try again."
                 );
             }
 
             throw error;
-
         } finally {
-
-            clearTimeout(
-                timeoutId
-            );
+            clearTimeout(timeoutId);
         }
     }
 
-
-    /* ============================================================
-       AUTH TABS
-       ============================================================ */
-
     function initAuthTabs() {
-
         const loginTab =
             $("login-tab") ||
-            qs(
-                '[data-auth-tab="login"]'
-            );
+            qs('[data-auth-tab="login"]');
 
         const signupTab =
             $("signup-tab") ||
-            qs(
-                '[data-auth-tab="signup"]'
-            );
+            qs('[data-auth-tab="signup"]');
 
         const loginPanel =
             $("login-panel") ||
             $("login-form-panel") ||
-            qs(
-                '[data-auth-panel="login"]'
-            );
+            qs('[data-auth-panel="login"]');
 
         const signupPanel =
             $("signup-panel") ||
             $("signup-form-panel") ||
-            qs(
-                '[data-auth-panel="signup"]'
-            );
-
+            qs('[data-auth-panel="signup"]');
 
         function showLogin() {
-
             if (loginTab) {
-                loginTab.classList.add(
-                    "active"
-                );
+                loginTab.classList.add("active");
             }
 
             if (signupTab) {
-                signupTab.classList.remove(
-                    "active"
-                );
+                signupTab.classList.remove("active");
             }
 
             if (loginPanel) {
@@ -505,24 +315,17 @@
             }
 
             if (signupPanel) {
-                signupPanel.style.display =
-                    "none";
+                signupPanel.style.display = "none";
             }
         }
 
-
         function showSignup() {
-
             if (signupTab) {
-                signupTab.classList.add(
-                    "active"
-                );
+                signupTab.classList.add("active");
             }
 
             if (loginTab) {
-                loginTab.classList.remove(
-                    "active"
-                );
+                loginTab.classList.remove("active");
             }
 
             if (signupPanel) {
@@ -530,101 +333,63 @@
             }
 
             if (loginPanel) {
-                loginPanel.style.display =
-                    "none";
+                loginPanel.style.display = "none";
             }
         }
 
-
         if (loginTab) {
-
             loginTab.addEventListener(
                 "click",
-                event => {
-
+                function (event) {
                     event.preventDefault();
-
                     showLogin();
                 }
             );
         }
-
 
         if (signupTab) {
-
             signupTab.addEventListener(
                 "click",
-                event => {
-
+                function (event) {
                     event.preventDefault();
-
                     showSignup();
                 }
             );
         }
 
-
         qsa(
-            "#create-account, " +
-            "#create-account-link, " +
-            ".create-account-link, " +
-            "[data-action='create-account']"
+            "#create-account, #create-account-link, .create-account-link, [data-action='create-account']"
         ).forEach(button => {
-
             button.addEventListener(
                 "click",
-                event => {
-
+                function (event) {
                     event.preventDefault();
-
                     showSignup();
                 }
             );
         });
 
-
         qsa(
-            "#back-to-login, " +
-            ".back-to-login, " +
-            "[data-action='back-login']"
+            "#back-to-login, .back-to-login, [data-action='back-login']"
         ).forEach(button => {
-
             button.addEventListener(
                 "click",
-                event => {
-
+                function (event) {
                     event.preventDefault();
-
                     showLogin();
                 }
             );
         });
 
-
-        /*
-         * Default page = Login.
-         */
-
-        if (
-            loginPanel &&
-            signupPanel
-        ) {
+        if (loginPanel && signupPanel) {
             showLogin();
         }
     }
 
-
-    /* ============================================================
-       LOGIN
-       ============================================================ */
-
     function initLogin() {
-
         const form =
             $("login-form") ||
-            qs(
-                "form[data-form='login']"
-            );
+            qs("form[data-form='login']");
 
         const button =
             $("btn-do-login") ||
@@ -633,45 +398,35 @@
                 "#login-form button[type='submit']"
             );
 
-
-        if (!form && !button) {
-            return;
-        }
-
+        if (!form && !button) return;
 
         async function login(event) {
-
             event.preventDefault();
 
-
             const email =
-                $("login_email")?.value.trim() ||
-                $("login-email")?.value.trim() ||
-                "";
-
+                (
+                    $("login_email") ||
+                    $("login-email")
+                )?.value.trim() || "";
 
             const password =
-                $("login_password")?.value ||
-                $("login-password")?.value ||
-                "";
-
+                (
+                    $("login_password") ||
+                    $("login-password")
+                )?.value || "";
 
             const message =
                 $("login-message") ||
                 qs(".login-message");
 
-
             if (!email || !password) {
-
                 showMessage(
                     message,
                     "Please enter your email and password.",
                     "error"
                 );
-
                 return;
             }
-
 
             setButtonLoading(
                 button,
@@ -679,64 +434,44 @@
                 "Sign In →"
             );
 
-
             try {
-
-                const result =
-                    await apiRequest(
-                        "login",
-                        {
-                            email,
-                            password
-                        }
-                    );
-
+                const result = await apiRequest(
+                    "login",
+                    {
+                        email,
+                        password
+                    }
+                );
 
                 state.loggedIn = true;
-
-                state.user =
-                    result.user ||
-                    null;
-
+                state.user = result.user || null;
 
                 showMessage(
                     message,
                     result.message ||
-                    "Login successful.",
+                        "Login successful.",
                     "success"
                 );
 
-
-                /*
-                 * Reload page so the PHP session is active.
-                 */
-
-                setTimeout(() => {
-
+                setTimeout(function () {
                     window.location.replace(
                         window.location.pathname +
-                        "?t=" +
-                        Date.now()
+                            "?t=" +
+                            Date.now()
                     );
-
                 }, 500);
-
-
             } catch (error) {
-
                 console.error(
                     "Login error:",
                     error
                 );
 
-
                 showMessage(
                     message,
                     error.message ||
-                    "Login failed.",
+                        "Login failed.",
                     "error"
                 );
-
 
                 setButtonLoading(
                     button,
@@ -746,16 +481,12 @@
             }
         }
 
-
         if (form) {
-
             form.addEventListener(
                 "submit",
                 login
             );
-
         } else {
-
             button.addEventListener(
                 "click",
                 login
@@ -763,18 +494,10 @@
         }
     }
 
-
-    /* ============================================================
-       CREATE ACCOUNT
-       ============================================================ */
-
     function initSignup() {
-
         const form =
             $("signup-form") ||
-            qs(
-                "form[data-form='signup']"
-            );
+            qs("form[data-form='signup']");
 
         const button =
             $("btn-do-signup") ||
@@ -783,16 +506,10 @@
                 "#signup-form button[type='submit']"
             );
 
-
-        if (!form && !button) {
-            return;
-        }
-
+        if (!form && !button) return;
 
         async function signup(event) {
-
             event.preventDefault();
-
 
             const name =
                 $("signup_name")?.value.trim() ||
@@ -837,59 +554,39 @@
                 !termsElement ||
                 termsElement.checked;
 
-
             const message =
                 $("signup-message") ||
                 qs(".signup-message");
 
-
-            if (
-                !name ||
-                !email ||
-                !password
-            ) {
-
+            if (!name || !email || !password) {
                 showMessage(
                     message,
                     "Please fill in all required fields.",
                     "error"
                 );
-
                 return;
             }
-
 
             const passwordRegex =
                 /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
-
-            if (
-                !passwordRegex.test(
-                    password
-                )
-            ) {
-
+            if (!passwordRegex.test(password)) {
                 showMessage(
                     message,
                     "Password must contain at least 8 characters, including uppercase, lowercase, number and special character.",
                     "error"
                 );
-
                 return;
             }
 
-
             if (!terms) {
-
                 showMessage(
                     message,
                     "Please accept the terms and conditions.",
                     "error"
                 );
-
                 return;
             }
-
 
             setButtonLoading(
                 button,
@@ -897,45 +594,33 @@
                 "Create Account"
             );
 
-
             try {
-
-                const result =
-                    await apiRequest(
-                        "signup",
-                        {
-                            name,
-                            email,
-                            password,
-                            university,
-                            branch,
-                            major,
-                            graduation_year:
-                                gradYear,
-                            linkedin,
-                            github,
-
-                            /*
-                             * No predefined company.
-                             * No predefined role.
-                             */
-
-                            target_company: "",
-                            target_role: ""
-                        }
-                    );
-
+                const result = await apiRequest(
+                    "signup",
+                    {
+                        name,
+                        email,
+                        password,
+                        university,
+                        branch,
+                        major,
+                        graduation_year:
+                            gradYear,
+                        linkedin,
+                        github,
+                        target_company: "",
+                        target_role: ""
+                    }
+                );
 
                 showMessage(
                     message,
                     result.message ||
-                    "Account created successfully.",
+                        "Account created successfully.",
                     "success"
                 );
 
-
-                setTimeout(() => {
-
+                setTimeout(function () {
                     const loginTab =
                         $("login-tab") ||
                         qs(
@@ -950,21 +635,20 @@
                         $("login_email").value =
                             email;
                     }
-
                 }, 700);
-
-
             } catch (error) {
+                console.error(
+                    "Signup error:",
+                    error
+                );
 
                 showMessage(
                     message,
                     error.message ||
-                    "Account creation failed.",
+                        "Account creation failed.",
                     "error"
                 );
-
             } finally {
-
                 setButtonLoading(
                     button,
                     false,
@@ -973,16 +657,12 @@
             }
         }
 
-
         if (form) {
-
             form.addEventListener(
                 "submit",
                 signup
             );
-
         } else {
-
             button.addEventListener(
                 "click",
                 signup
@@ -990,91 +670,63 @@
         }
     }
 
-
-    /* ============================================================
-       PASSWORD TOGGLE
-       ============================================================ */
-
     function initPasswordToggles() {
-
         qsa(
-            "#toggle-login-password, " +
-            "#toggle-signup-password, " +
-            "[data-toggle-password]"
+            "#toggle-login-password, #toggle-signup-password, [data-toggle-password]"
         ).forEach(button => {
-
             button.addEventListener(
                 "click",
-                event => {
-
+                function (event) {
                     event.preventDefault();
-
 
                     let input = null;
 
-
                     const targetId =
-                        button.dataset.togglePassword;
-
+                        button.dataset
+                            .togglePassword;
 
                     if (targetId) {
                         input = $(targetId);
                     }
 
-
                     if (
                         !input &&
-                        button.id.includes("login")
+                        button.id.includes(
+                            "login"
+                        )
                     ) {
                         input =
                             $("login_password");
                     }
 
-
                     if (
                         !input &&
-                        button.id.includes("signup")
+                        button.id.includes(
+                            "signup"
+                        )
                     ) {
                         input =
                             $("signup_pwd");
                     }
 
-
-                    if (!input) {
-                        return;
-                    }
-
+                    if (!input) return;
 
                     if (
                         input.type ===
                         "password"
                     ) {
-
                         input.type = "text";
-
-                        button.textContent =
-                            "🙈";
-
+                        button.textContent = "🙈";
                     } else {
-
-                        input.type =
-                            "password";
-
-                        button.textContent =
-                            "👁️";
+                        input.type = "password";
+                        button.textContent = "👁️";
                     }
                 }
             );
         });
     }
 
-
-    /* ============================================================
-       THEME
-       ============================================================ */
-
     function initThemeToggle() {
-
         let toggle =
             $("theme-toggle") ||
             $("themeToggle") ||
@@ -1082,44 +734,35 @@
             $("darkModeToggle") ||
             $("btn-theme") ||
             $("theme-btn") ||
-            qs(
-                "[data-theme-toggle]"
-            );
-
-
-        /*
-         * If no button exists, create one.
-         */
+            qs("[data-theme-toggle]");
 
         if (!toggle) {
+            toggle = qs(
+                ".theme-toggle, .dark-toggle, .mode-toggle"
+            );
+        }
 
+        if (!toggle) {
             const header =
                 qs(".topbar") ||
                 qs(".navbar") ||
                 qs(".header") ||
                 qs("header");
 
-
             if (header) {
-
                 toggle =
                     document.createElement(
                         "button"
                     );
 
                 toggle.type = "button";
-
-                toggle.id =
-                    "theme-toggle";
-
+                toggle.id = "theme-toggle";
                 toggle.className =
                     "theme-toggle";
-
                 toggle.setAttribute(
                     "aria-label",
                     "Toggle theme"
                 );
-
                 toggle.innerHTML = "🌙";
 
                 header.appendChild(
@@ -1128,54 +771,41 @@
             }
         }
 
-
-        if (!toggle) {
-            return;
-        }
-
+        if (!toggle) return;
 
         function applyTheme(theme) {
-
             const dark =
                 theme === "dark";
 
-
-            document.documentElement
-                .setAttribute(
-                    "data-theme",
-                    theme
-                );
-
+            document.documentElement.setAttribute(
+                "data-theme",
+                theme
+            );
 
             document.body.classList.toggle(
                 "dark-mode",
                 dark
             );
 
-
             document.body.classList.toggle(
                 "dark-theme",
                 dark
             );
-
 
             document.body.classList.toggle(
                 "light-mode",
                 !dark
             );
 
-
             document.body.classList.toggle(
                 "light-theme",
                 !dark
             );
 
-
             localStorage.setItem(
                 "skill-gap-theme",
                 theme
             );
-
 
             toggle.setAttribute(
                 "aria-label",
@@ -1184,45 +814,24 @@
                     : "Switch to dark mode"
             );
 
-
-            /*
-             * Change icon only.
-             */
-
-            const currentText =
-                toggle.textContent || "";
-
-
             if (
-                currentText.includes("🌙") ||
-                currentText.includes("☀️") ||
                 toggle.children.length === 0
             ) {
-
                 toggle.textContent =
-                    dark
-                        ? "☀️"
-                        : "🌙";
+                    dark ? "☀️" : "🌙";
             }
         }
-
 
         const saved =
             localStorage.getItem(
                 "skill-gap-theme"
             );
 
-
         applyTheme(
             saved === "dark"
                 ? "dark"
                 : "light"
         );
-
-
-        /*
-         * Prevent duplicate listeners.
-         */
 
         if (
             toggle.dataset.themeBound ===
@@ -1231,25 +840,17 @@
             return;
         }
 
-
-        toggle.dataset.themeBound =
-            "true";
-
+        toggle.dataset.themeBound = "true";
 
         toggle.addEventListener(
             "click",
-            event => {
-
+            function (event) {
                 event.preventDefault();
 
-
                 const current =
-                    document.documentElement
-                        .getAttribute(
-                            "data-theme"
-                        ) ||
-                    "light";
-
+                    document.documentElement.getAttribute(
+                        "data-theme"
+                    ) || "light";
 
                 applyTheme(
                     current === "dark"
@@ -1260,128 +861,30 @@
         );
     }
 
-
-    /* ============================================================
-       AUTH PAGE VISIBILITY
-       ============================================================ */
-
-    function hideCareerElementsWhenLoggedOut() {
-
-        if (state.loggedIn) {
-            return;
-        }
-
-
-        const selectors = [
-
-            "#career-url-panel",
-
-            "#career-url-section",
-
-            "#career-url-container",
-
-            "#career-scraper",
-
-            "#dynamic-career-panel",
-
-            ".career-url-panel",
-
-            ".career-scraper",
-
-            "#career-url",
-
-            "#dynamic-career-url"
-        ];
-
-
-        selectors.forEach(selector => {
-
-            qsa(selector).forEach(element => {
-
-                element.style.display =
-                    "none";
-
-            });
-        });
-
-
-        /*
-         * Hide dashboard-specific elements.
-         */
-
-        qsa(
-            "#dashboard, " +
-            "#app-dashboard, " +
-            ".dashboard-page, " +
-            ".main-app"
-        ).forEach(element => {
-
-            if (
-                element.id ===
-                "login-panel" ||
-                element.id ===
-                "signup-panel"
-            ) {
-                return;
-            }
-
-            if (
-                element.contains(
-                    $("login-panel")
-                ) ||
-                element.contains(
-                    $("signup-panel")
-                )
-            ) {
-                return;
-            }
-
-            element.style.display =
-                "none";
-        });
-    }
-
-
-    /* ============================================================
-       SIDEBAR / NAVIGATION
-       ============================================================ */
-
     function initNavigation() {
-
         qsa(
             "[data-view], [data-page], [data-section]"
         ).forEach(link => {
-
             link.addEventListener(
                 "click",
-                event => {
-
+                function (event) {
                     const view =
                         link.dataset.view ||
                         link.dataset.page ||
                         link.dataset.section;
 
-
-                    if (!view) {
-                        return;
-                    }
-
+                    if (!view) return;
 
                     event.preventDefault();
 
-
                     qsa(
-                        ".page-view, " +
-                        ".dashboard-view, " +
-                        "[data-page-view]"
+                        ".page-view, .dashboard-view, [data-page-view]"
                     ).forEach(page => {
-
                         const pageName =
                             page.dataset.view ||
                             page.dataset.page ||
                             page.dataset.section ||
                             page.id;
-
 
                         page.style.display =
                             pageName === view
@@ -1389,18 +892,13 @@
                                 : "none";
                     });
 
-
                     qsa(
-                        "[data-view], " +
-                        "[data-page], " +
-                        "[data-section]"
+                        "[data-view], [data-page], [data-section]"
                     ).forEach(item => {
-
                         const itemView =
                             item.dataset.view ||
                             item.dataset.page ||
                             item.dataset.section;
-
 
                         item.classList.toggle(
                             "active",
@@ -1408,70 +906,41 @@
                         );
                     });
 
-
                     closeSidebar();
                 }
             );
         });
     }
 
-
-    /* ============================================================
-       MOBILE MENU
-       ============================================================ */
-
     function closeSidebar() {
-
         document.body.classList.remove(
             "sidebar-open"
         );
 
-
         qsa(
-            "#sidebar, " +
-            ".sidebar, " +
-            ".side-nav"
+            "#sidebar, .sidebar, .side-nav"
         ).forEach(sidebar => {
-
-            sidebar.classList.remove(
-                "open"
-            );
-
-            sidebar.classList.remove(
-                "active"
-            );
+            sidebar.classList.remove("open");
+            sidebar.classList.remove("active");
         });
     }
 
-
     function initMobileMenu() {
-
         qsa(
-            "#menu-toggle, " +
-            "#hamburger, " +
-            "#mobile-menu, " +
-            ".menu-toggle, " +
-            "[data-menu-toggle]"
+            "#menu-toggle, #hamburger, #mobile-menu, .menu-toggle, [data-menu-toggle]"
         ).forEach(button => {
-
             button.addEventListener(
                 "click",
-                event => {
-
+                function (event) {
                     event.preventDefault();
-
 
                     document.body.classList.toggle(
                         "sidebar-open"
                     );
 
-
                     qsa(
-                        "#sidebar, " +
-                        ".sidebar, " +
-                        ".side-nav"
+                        "#sidebar, .sidebar, .side-nav"
                     ).forEach(sidebar => {
-
                         sidebar.classList.toggle(
                             "open"
                         );
@@ -1484,13 +953,9 @@
             );
         });
 
-
         qsa(
-            "#sidebar-close, " +
-            ".sidebar-close, " +
-            "[data-sidebar-close]"
+            "#sidebar-close, .sidebar-close, [data-sidebar-close]"
         ).forEach(button => {
-
             button.addEventListener(
                 "click",
                 closeSidebar
@@ -1498,140 +963,73 @@
         });
     }
 
-
-    /* ============================================================
-       CAREER URL INPUT
-       ============================================================ */
-
     function findCareerURLInput() {
-
         const selectors = [
-
             "#career-url",
-
             "#career_url",
-
             "#scrape-url",
-
             "#job-url",
-
             "#target-url",
-
             "#url-input",
-
             "#careerUrl",
-
             "input[name='career_url']",
-
             "input[name='careerUrl']"
         ];
 
+        for (const selector of selectors) {
+            const element = qs(selector);
 
-        for (
-            const selector of selectors
-        ) {
-
-            const element =
-                qs(selector);
-
-            if (element) {
-                return element;
-            }
+            if (element) return element;
         }
-
 
         return null;
     }
 
-
     function findCareerButton() {
-
         const selectors = [
-
             "#scrape",
-
             "#btn-scrape",
-
             "#btn-scrape-url",
-
             "#scrape-url-btn",
-
             "#load-careers",
-
             "#find-jobs",
-
             "#career-scrape-btn",
-
             "#dynamic-career-scrape-btn"
         ];
 
+        for (const selector of selectors) {
+            const element = qs(selector);
 
-        for (
-            const selector of selectors
-        ) {
-
-            const element =
-                qs(selector);
-
-            if (element) {
-                return element;
-            }
+            if (element) return element;
         }
-
 
         return null;
     }
 
-
-    /* ============================================================
-       CREATE DYNAMIC CAREER PANEL
-       ============================================================ */
-
     function createCareerPanel() {
+        if (!state.loggedIn) return;
 
-        /*
-         * NEVER create Career URL on Login/Create Account page.
-         */
-
-        if (!state.loggedIn) {
+        if ($("dynamic-career-panel")) {
             return;
         }
-
-
-        if (
-            $("dynamic-career-panel")
-        ) {
-            return;
-        }
-
 
         const sidebar =
             $("sidebar") ||
             qs(".sidebar") ||
             qs(".side-nav");
 
-
-        if (!sidebar) {
-            return;
-        }
-
+        if (!sidebar) return;
 
         const panel =
-            document.createElement(
-                "div"
-            );
-
+            document.createElement("div");
 
         panel.id =
             "dynamic-career-panel";
 
-
         panel.className =
             "career-url-panel";
 
-
         panel.innerHTML = `
-
             <div class="career-url-title">
                 Career URL
             </div>
@@ -1660,39 +1058,20 @@
             ></div>
         `;
 
-
-        sidebar.prepend(
-            panel
-        );
+        sidebar.prepend(panel);
     }
 
-
-    /* ============================================================
-       GET CAREER URL
-       ============================================================ */
-
     function getCareerURL() {
-
         const input =
             findCareerURLInput() ||
             $("dynamic-career-url");
 
-
-        if (!input) {
-            return "";
-        }
-
+        if (!input) return "";
 
         return input.value.trim();
     }
 
-
-    /* ============================================================
-       NORMALIZE JOB
-       ============================================================ */
-
     function normalizeJob(job) {
-
         if (
             !job ||
             typeof job !== "object"
@@ -1700,20 +1079,17 @@
             return null;
         }
 
-
         const title =
             job.title ||
             job.role ||
             job.position ||
             "";
 
-
         const company =
             job.company ||
             job.organization ||
             job.employer ||
             "";
-
 
         let skills =
             job.required_skills ||
@@ -1722,67 +1098,38 @@
             job.requirements ||
             [];
 
-
-        if (
-            typeof skills === "string"
-        ) {
-
-            skills =
-                skills
-                    .split(
-                        /[,;\n|]/
-                    )
-                    .map(
-                        x => x.trim()
-                    )
-                    .filter(Boolean);
+        if (typeof skills === "string") {
+            skills = skills
+                .split(/[,;\n|]/)
+                .map(x => x.trim())
+                .filter(Boolean);
         }
 
-
         return {
-
             ...job,
-
-            title:
-                text(title),
-
-            role:
-                text(
-                    job.role ||
-                    title
-                ),
-
-            company:
-                text(company),
-
+            title: String(title),
+            role: String(
+                job.role || title
+            ),
+            company: String(company),
             required_skills:
-                normalizeSkills(
-                    skills
-                ),
-
+                normalizeSkills(skills),
             url:
                 job.url ||
                 job.link ||
                 job.apply_url ||
                 "",
-
             location:
-                job.location ||
-                "",
-
+                job.location || "",
             description:
-                job.description ||
-                ""
+                job.description || ""
         };
     }
 
-
     function normalizeJobs(jobs) {
-
         if (!Array.isArray(jobs)) {
             return [];
         }
-
 
         return jobs
             .map(normalizeJob)
@@ -1793,16 +1140,10 @@
             );
     }
 
-
-    /* ============================================================
-       MATCHING
-       ============================================================ */
-
     function skillMatches(
         resumeSkill,
         requiredSkill
     ) {
-
         const a =
             normalizeSkill(
                 resumeSkill
@@ -1813,16 +1154,9 @@
                 requiredSkill
             );
 
+        if (!a || !b) return false;
 
-        if (!a || !b) {
-            return false;
-        }
-
-
-        if (a === b) {
-            return true;
-        }
-
+        if (a === b) return true;
 
         if (
             a.length >= 4 &&
@@ -1835,50 +1169,37 @@
             return true;
         }
 
-
         return false;
     }
-
 
     function calculateMatch(
         job,
         resumeSkills
     ) {
-
         const required =
             normalizeSkills(
                 job.required_skills
             );
-
 
         const resume =
             normalizeSkills(
                 resumeSkills
             );
 
-
         if (!required.length) {
-
             return {
-
                 score: 0,
-
                 matched: [],
-
                 missing: [],
-
                 hasRequirements: false
             };
         }
 
-
         const matched = [];
         const missing = [];
 
-
         required.forEach(
             requiredSkill => {
-
                 const exists =
                     resume.some(
                         resumeSkill =>
@@ -1888,22 +1209,17 @@
                             )
                     );
 
-
                 if (exists) {
-
                     matched.push(
                         requiredSkill
                     );
-
                 } else {
-
                     missing.push(
                         requiredSkill
                     );
                 }
             }
         );
-
 
         const score =
             Math.round(
@@ -1913,344 +1229,262 @@
                 ) * 100
             );
 
-
         return {
-
             score,
-
             matched,
-
             missing,
-
             hasRequirements: true
         };
     }
 
-
     function rankJobs(jobs) {
-
         return normalizeJobs(jobs)
             .map(job => {
-
                 const match =
                     calculateMatch(
                         job,
                         state.extractedSkills
                     );
 
-
                 return {
-
                     ...job,
-
                     matchScore:
                         match.score,
-
                     matchedSkills:
                         match.matched,
-
                     missingSkills:
                         match.missing,
-
                     hasRequirements:
                         match.hasRequirements
                 };
             })
-            .sort(
-                (a, b) => {
-
-                    if (
-                        b.matchScore !==
-                        a.matchScore
-                    ) {
-
-                        return (
-                            b.matchScore -
-                            a.matchScore
-                        );
-                    }
-
-
+            .sort((a, b) => {
+                if (
+                    b.matchScore !==
+                    a.matchScore
+                ) {
                     return (
-                        b.matchedSkills.length -
-                        a.matchedSkills.length
+                        b.matchScore -
+                        a.matchScore
                     );
                 }
-            );
+
+                return (
+                    b.matchedSkills.length -
+                    a.matchedSkills.length
+                );
+            });
     }
 
-
-    /* ============================================================
-       JOB RESULTS
-       ============================================================ */
-
     function getJobContainer() {
-
         const selectors = [
-
             "#job-results",
-
             "#career-jobs",
-
             "#job-ranking-results",
-
             "#job-results-container",
-
             ".job-results"
         ];
 
+        for (const selector of selectors) {
+            const element = qs(selector);
 
-        for (
-            const selector of selectors
-        ) {
-
-            const element =
-                qs(selector);
-
-            if (element) {
-                return element;
-            }
+            if (element) return element;
         }
-
 
         return null;
     }
 
-
     function renderJobs(jobs) {
-
         const container =
             getJobContainer();
 
-
-        if (!container) {
-            return;
-        }
-
+        if (!container) return;
 
         const ranked =
             rankJobs(jobs);
 
-
         if (!ranked.length) {
-
             container.innerHTML = `
-
                 <div class="empty-state">
                     No jobs were detected from the career URL.
                 </div>
-
             `;
 
             return;
         }
 
-
         container.innerHTML = `
-
             <div class="job-results-header">
-
-                <h3>
-                    Career Opportunities
-                </h3>
-
-                <span>
-                    ${ranked.length} role(s) found
-                </span>
-
+                <h3>Career Opportunities</h3>
+                <span>${ranked.length} role(s) found</span>
             </div>
 
-
             <div class="dynamic-job-list">
+                ${ranked
+                    .map(
+                        (job, index) => `
+                        <div
+                            class="dynamic-job-card ${
+                                index === 0 &&
+                                state.extractedSkills.length
+                                    ? "recommended"
+                                    : ""
+                            }"
+                        >
+                            <div class="job-card-header">
+                                <div>
+                                    <h4>
+                                        ${escapeHtml(
+                                            job.title
+                                        )}
+                                    </h4>
 
-                ${ranked.map(
-                    (job, index) => `
+                                    ${
+                                        job.company
+                                            ? `
+                                                <div class="job-company">
+                                                    ${escapeHtml(
+                                                        job.company
+                                                    )}
+                                                </div>
+                                            `
+                                            : ""
+                                    }
+                                </div>
 
-                    <div
-                        class="dynamic-job-card ${
-                            index === 0 &&
-                            state.extractedSkills.length
-                                ? "recommended"
-                                : ""
-                        }"
-                    >
+                                <div class="job-match-score">
+                                    ${
+                                        job.hasRequirements
+                                            ? job.matchScore +
+                                              "% Match"
+                                            : "Requirements unavailable"
+                                    }
+                                </div>
+                            </div>
 
-                        <div class="job-card-header">
+                            ${
+                                job.location
+                                    ? `
+                                        <div class="job-location">
+                                            ${escapeHtml(
+                                                job.location
+                                            )}
+                                        </div>
+                                    `
+                                    : ""
+                            }
 
-                            <div>
+                            ${
+                                job.hasRequirements
+                                    ? `
+                                        <div class="job-skills">
 
-                                <h4>
-                                    ${escapeHtml(
-                                        job.title
-                                    )}
-                                </h4>
+                                            ${
+                                                job.matchedSkills.length
+                                                    ? `
+                                                        <div>
+                                                            <strong>
+                                                                Matched:
+                                                            </strong>
+
+                                                            ${job.matchedSkills
+                                                                .map(
+                                                                    skill =>
+                                                                        `
+                                                                        <span class="skill matched">
+                                                                            ${escapeHtml(
+                                                                                skill
+                                                                            )}
+                                                                        </span>
+                                                                        `
+                                                                )
+                                                                .join("")}
+                                                        </div>
+                                                    `
+                                                    : ""
+                                            }
+
+                                            ${
+                                                job.missingSkills.length
+                                                    ? `
+                                                        <div>
+                                                            <strong>
+                                                                Missing:
+                                                            </strong>
+
+                                                            ${job.missingSkills
+                                                                .map(
+                                                                    skill =>
+                                                                        `
+                                                                        <span class="skill missing">
+                                                                            ${escapeHtml(
+                                                                                skill
+                                                                            )}
+                                                                        </span>
+                                                                        `
+                                                                )
+                                                                .join("")}
+                                                        </div>
+                                                    `
+                                                    : ""
+                                            }
+
+                                        </div>
+                                    `
+                                    : ""
+                            }
+
+                            <div class="job-card-actions">
+
+                                <button
+                                    type="button"
+                                    class="use-job-btn"
+                                    data-index="${index}"
+                                >
+                                    Use This Job
+                                </button>
 
                                 ${
-                                    job.company
+                                    job.url
                                         ? `
-                                            <div class="job-company">
-                                                ${escapeHtml(
-                                                    job.company
-                                                )}
-                                            </div>
-                                          `
+                                            <a
+                                                href="${escapeHtml(
+                                                    job.url
+                                                )}"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="job-link"
+                                            >
+                                                View Job
+                                            </a>
+                                        `
                                         : ""
                                 }
 
                             </div>
-
-
-                            <div class="job-match-score">
-
-                                ${
-                                    job.hasRequirements
-                                        ? job.matchScore +
-                                          "% Match"
-                                        : "Requirements unavailable"
-                                }
-
-                            </div>
-
                         </div>
-
-
-                        ${
-                            job.location
-                                ? `
-                                    <div class="job-location">
-                                        ${escapeHtml(
-                                            job.location
-                                        )}
-                                    </div>
-                                  `
-                                : ""
-                        }
-
-
-                        ${
-                            job.hasRequirements
-                                ? `
-
-                                    <div class="job-skills">
-
-                                        ${
-                                            job.matchedSkills.length
-                                                ? `
-                                                    <div>
-                                                        <strong>
-                                                            Matched:
-                                                        </strong>
-
-                                                        ${job.matchedSkills
-                                                            .map(
-                                                                skill =>
-                                                                    `
-                                                                    <span class="skill matched">
-                                                                        ${escapeHtml(
-                                                                            skill
-                                                                        )}
-                                                                    </span>
-                                                                    `
-                                                            )
-                                                            .join("")}
-                                                    </div>
-                                                  `
-                                                : ""
-                                        }
-
-
-                                        ${
-                                            job.missingSkills.length
-                                                ? `
-                                                    <div>
-                                                        <strong>
-                                                            Missing:
-                                                        </strong>
-
-                                                        ${job.missingSkills
-                                                            .map(
-                                                                skill =>
-                                                                    `
-                                                                    <span class="skill missing">
-                                                                        ${escapeHtml(
-                                                                            skill
-                                                                        )}
-                                                                    </span>
-                                                                    `
-                                                            )
-                                                            .join("")}
-                                                    </div>
-                                                  `
-                                                : ""
-                                        }
-
-                                    </div>
-
-                                  `
-                                : ""
-                        }
-
-
-                        <div class="job-card-actions">
-
-                            <button
-                                type="button"
-                                class="use-job-btn"
-                                data-index="${index}"
-                            >
-                                Use This Job
-                            </button>
-
-
-                            ${
-                                job.url
-                                    ? `
-                                        <a
-                                            href="${escapeHtml(
-                                                job.url
-                                            )}"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            class="job-link"
-                                        >
-                                            View Job
-                                        </a>
-                                      `
-                                    : ""
-                            }
-
-                        </div>
-
-                    </div>
-
-                `
-                ).join("")}
-
+                    `
+                    )
+                    .join("")}
             </div>
         `;
-
 
         qsa(
             ".use-job-btn",
             container
         ).forEach(button => {
-
             button.addEventListener(
                 "click",
-                async () => {
-
+                async function () {
                     const index =
                         Number(
                             button.dataset.index
                         );
 
-
                     const selected =
                         ranked[index];
 
-
                     if (selected) {
-
                         await useJob(
                             selected
                         );
@@ -2260,15 +1494,8 @@
         });
     }
 
-
-    /* ============================================================
-       SELECT JOB
-       ============================================================ */
-
     async function useJob(job) {
-
-        state.recommendedJob =
-            job;
+        state.recommendedJob = job;
 
         state.targetCompany =
             job.company || "";
@@ -2283,7 +1510,6 @@
                 job.required_skills
             );
 
-
         APP.targetCompany =
             state.targetCompany;
 
@@ -2296,12 +1522,10 @@
         APP.recommendedJob =
             job;
 
-
         updateTargetUI();
-
+        renderRecommendation(job);
 
         try {
-
             await apiRequest(
                 "get_metrics",
                 {
@@ -2315,74 +1539,49 @@
                         state.requiredSkills
                 }
             );
-
         } catch (error) {
-
             console.warn(
                 "Target save warning:",
                 error.message
             );
         }
-
-
-        renderRecommendation(
-            job
-        );
     }
 
-
-    /* ============================================================
-       SCRAPE CAREER URL
-       ============================================================ */
-
     async function scrapeCareerURL() {
-
-        if (!state.loggedIn) {
-            return;
-        }
-
+        if (!state.loggedIn) return;
 
         const url =
             getCareerURL();
-
 
         const status =
             $("dynamic-career-status") ||
             $("career-url-status") ||
             $("scrape-status");
 
-
         const button =
             findCareerButton();
 
-
         if (!url) {
-
             showMessage(
                 status,
                 "Please enter a career or jobs URL.",
                 "error"
             );
-
             return;
         }
-
 
         if (
             !/^https?:\/\/.+/i.test(
                 url
             )
         ) {
-
             showMessage(
                 status,
                 "Please enter a valid URL beginning with http:// or https://.",
                 "error"
             );
-
             return;
         }
-
 
         setButtonLoading(
             button,
@@ -2390,25 +1589,19 @@
             "Find Jobs"
         );
 
-
         showMessage(
             status,
             "Reading jobs from the career page...",
             "info"
         );
 
-
         try {
-
             const result =
                 await apiRequest(
                     "scrape_url",
-                    {
-                        url
-                    },
+                    { url },
                     90000
                 );
-
 
             const jobs =
                 normalizeJobs(
@@ -2418,21 +1611,15 @@
                     []
                 );
 
-
             state.careerUrl =
                 url;
 
             state.careerJobs =
                 jobs;
 
-
-            renderJobs(
-                jobs
-            );
-
+            renderJobs(jobs);
 
             if (!jobs.length) {
-
                 showMessage(
                     status,
                     "No job listings were detected from this page.",
@@ -2442,58 +1629,37 @@
                 return;
             }
 
-
             showMessage(
                 status,
                 `${jobs.length} job(s) found successfully.`,
                 "success"
             );
 
-
-            /*
-             * If resume already exists,
-             * automatically calculate matches.
-             */
-
             if (
                 state.extractedSkills.length
             ) {
-
                 const ranked =
-                    rankJobs(
-                        jobs
-                    );
+                    rankJobs(jobs);
 
-
-                if (
-                    ranked.length
-                ) {
-
+                if (ranked.length) {
                     await useJob(
                         ranked[0]
                     );
                 }
             }
-
-
         } catch (error) {
-
             console.error(
                 "Career URL error:",
                 error
             );
 
-
             showMessage(
                 status,
                 error.message ||
-                "Unable to read the career URL.",
+                    "Unable to read the career URL.",
                 "error"
             );
-
-
         } finally {
-
             setButtonLoading(
                 button,
                 false,
@@ -2502,68 +1668,42 @@
         }
     }
 
-
-    /* ============================================================
-       CAREER URL INITIALIZATION
-       ============================================================ */
-
     function initCareerURL() {
-
-        /*
-         * Critical:
-         * Do NOT run this on login/signup.
-         */
-
-        if (!state.loggedIn) {
-            return;
-        }
-
+        if (!state.loggedIn) return;
 
         createCareerPanel();
-
 
         const input =
             findCareerURLInput() ||
             $("dynamic-career-url");
 
-
         const button =
             findCareerButton();
 
-
         if (button) {
-
             button.addEventListener(
                 "click",
-                event => {
-
+                function (event) {
                     event.preventDefault();
-
                     scrapeCareerURL();
                 }
             );
         }
 
-
         if (input) {
-
             if (state.careerUrl) {
                 input.value =
                     state.careerUrl;
             }
 
-
             input.addEventListener(
                 "keydown",
-                event => {
-
+                function (event) {
                     if (
                         event.key ===
                         "Enter"
                     ) {
-
                         event.preventDefault();
-
                         scrapeCareerURL();
                     }
                 }
@@ -2571,58 +1711,33 @@
         }
     }
 
-
-    /* ============================================================
-       RESUME UPLOAD
-       ============================================================ */
-
     function findResumeInput() {
-
         const selectors = [
-
             "#resume_file",
-
             "#resume-file",
-
             "#resume",
-
             "#resume_upload",
-
             "input[name='resume']",
-
             "input[type='file']"
         ];
 
-
-        for (
-            const selector of selectors
-        ) {
-
+        for (const selector of selectors) {
             const input =
                 qs(selector);
 
-            if (input) {
-                return input;
-            }
+            if (input) return input;
         }
-
 
         return null;
     }
 
-
     async function uploadResume(file) {
-
-        if (!file) {
-            return;
-        }
-
+        if (!file) return;
 
         const status =
             $("resume-status") ||
             $("upload-status") ||
             $("resume-message");
-
 
         showMessage(
             status,
@@ -2630,9 +1745,7 @@
             "info"
         );
 
-
         try {
-
             const result =
                 await apiRequest(
                     "upload_resume",
@@ -2642,7 +1755,6 @@
                     90000
                 );
 
-
             state.extractedSkills =
                 normalizeSkills(
                     result.extracted_skills ||
@@ -2651,7 +1763,6 @@
                     []
                 );
 
-
             state.atsScore =
                 Number(
                     result.ats_score ||
@@ -2659,385 +1770,261 @@
                     0
                 );
 
-
             APP.extractedSkills =
                 state.extractedSkills;
 
             APP.atsScore =
                 state.atsScore;
 
-
             renderSkills();
-
             renderATS();
-
 
             showMessage(
                 status,
                 result.message ||
-                "Resume parsed successfully.",
+                    "Resume parsed successfully.",
                 "success"
             );
-
-
-            /*
-             * Recalculate jobs.
-             */
 
             if (
                 state.careerJobs.length
             ) {
-
                 renderJobs(
                     state.careerJobs
                 );
-
 
                 const ranked =
                     rankJobs(
                         state.careerJobs
                     );
 
-
-                if (
-                    ranked.length
-                ) {
-
+                if (ranked.length) {
                     await useJob(
                         ranked[0]
                     );
                 }
             }
-
-
         } catch (error) {
-
             showMessage(
                 status,
                 error.message ||
-                "Unable to parse the resume.",
+                    "Unable to parse the resume.",
                 "error"
             );
         }
     }
 
-
     function initResumeUpload() {
-
         const input =
             findResumeInput();
 
-
-        if (!input) {
-            return;
-        }
-
+        if (!input) return;
 
         input.addEventListener(
             "change",
-            () => {
-
+            function () {
                 const file =
                     input.files &&
                     input.files[0];
 
-
                 if (file) {
-                    uploadResume(
-                        file
-                    );
+                    uploadResume(file);
                 }
             }
         );
     }
 
-
-    /* ============================================================
-       SKILLS
-       ============================================================ */
-
     function renderSkills() {
-
         const containers = [
-
             $("extracted-skills"),
-
             $("resume-skills"),
-
             $("skills-list"),
-
             $("skill-list")
         ].filter(Boolean);
 
+        containers.forEach(container => {
+            if (
+                !state.extractedSkills.length
+            ) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        Upload a resume to extract your skills.
+                    </div>
+                `;
 
-        containers.forEach(
-            container => {
-
-                if (
-                    !state.extractedSkills.length
-                ) {
-
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            Upload a resume to extract your skills.
-                        </div>
-                    `;
-
-                    return;
-                }
-
-
-                container.innerHTML =
-                    state.extractedSkills
-                        .map(
-                            skill =>
-                                `
-                                <span class="skill-tag">
-                                    ${escapeHtml(
-                                        skill
-                                    )}
-                                </span>
-                                `
-                        )
-                        .join("");
+                return;
             }
-        );
+
+            container.innerHTML =
+                state.extractedSkills
+                    .map(
+                        skill =>
+                            `
+                            <span class="skill-tag">
+                                ${escapeHtml(
+                                    skill
+                                )}
+                            </span>
+                            `
+                    )
+                    .join("");
+        });
     }
 
-
-    /* ============================================================
-       ATS
-       ============================================================ */
-
     function renderATS() {
-
         const score =
             Math.max(
                 0,
                 Math.min(
                     100,
                     Number(
-                        state.atsScore ||
-                        0
+                        state.atsScore || 0
                     )
                 )
             );
 
-
         qsa(
-            "#ats-score, " +
-            "#atsScore, " +
-            "#ats-score-value"
-        ).forEach(
-            element => {
-
-                element.textContent =
-                    Math.round(score) +
-                    "%";
-            }
-        );
-
+            "#ats-score, #atsScore, #ats-score-value"
+        ).forEach(element => {
+            element.textContent =
+                Math.round(score) +
+                "%";
+        });
 
         const progress =
             $("ats-progress") ||
-            qs(
-                ".ats-progress-bar"
-            );
-
+            qs(".ats-progress-bar");
 
         if (progress) {
-
             progress.style.width =
                 score + "%";
         }
     }
 
-
-    /* ============================================================
-       TARGET UI
-       ============================================================ */
-
     function updateTargetUI() {
-
         const role =
             state.targetRole ||
             "No career role selected";
-
 
         const company =
             state.targetCompany ||
             "Dynamic career target";
 
+        qsa(
+            "#target-role, #targetRole, .target-role"
+        ).forEach(element => {
+            element.textContent = role;
+        });
 
         qsa(
-            "#target-role, " +
-            "#targetRole, " +
-            ".target-role"
-        ).forEach(
-            element => {
-
-                element.textContent =
-                    role;
-            }
-        );
-
+            "#target-company, #targetCompany, .target-company"
+        ).forEach(element => {
+            element.textContent = company;
+        });
 
         qsa(
-            "#target-company, " +
-            "#targetCompany, " +
-            ".target-company"
-        ).forEach(
-            element => {
+            "#required-skills, .required-skills"
+        ).forEach(container => {
+            if (
+                !state.requiredSkills.length
+            ) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        No job requirements detected yet.
+                    </div>
+                `;
 
-                element.textContent =
-                    company;
+                return;
             }
-        );
 
-
-        qsa(
-            "#required-skills, " +
-            ".required-skills"
-        ).forEach(
-            container => {
-
-                if (
-                    !state.requiredSkills.length
-                ) {
-
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            No job requirements detected yet.
-                        </div>
-                    `;
-
-                    return;
-                }
-
-
-                container.innerHTML =
-                    state.requiredSkills
-                        .map(
-                            skill =>
-                                `
-                                <span class="skill-tag required">
-                                    ${escapeHtml(
-                                        skill
-                                    )}
-                                </span>
-                                `
-                        )
-                        .join("");
-            }
-        );
+            container.innerHTML =
+                state.requiredSkills
+                    .map(
+                        skill =>
+                            `
+                            <span class="skill-tag required">
+                                ${escapeHtml(
+                                    skill
+                                )}
+                            </span>
+                            `
+                    )
+                    .join("");
+        });
     }
 
-
-    /* ============================================================
-       RECOMMENDATION
-       ============================================================ */
-
-    function renderRecommendation(
-        job
-    ) {
-
-        if (!job) {
-            return;
-        }
-
+    function renderRecommendation(job) {
+        if (!job) return;
 
         qsa(
-            "#recommended-job, " +
-            "#job-recommendation, " +
-            "#recommendedJob"
-        ).forEach(
-            container => {
+            "#recommended-job, #job-recommendation, #recommendedJob"
+        ).forEach(container => {
+            container.innerHTML = `
+                <div class="recommendation-card">
 
-                container.innerHTML = `
-
-                    <div class="recommendation-card">
-
-                        <div class="recommendation-label">
-                            Recommended Match
-                        </div>
-
-                        <h3>
-                            ${escapeHtml(
-                                job.title ||
-                                job.role ||
-                                ""
-                            )}
-                        </h3>
-
-                        ${
-                            job.company
-                                ? `
-                                    <p>
-                                        ${escapeHtml(
-                                            job.company
-                                        )}
-                                    </p>
-                                  `
-                                : ""
-                        }
-
-                        ${
-                            job.matchScore !== undefined
-                                ? `
-                                    <strong>
-                                        ${job.matchScore}% skill match
-                                    </strong>
-                                  `
-                                : ""
-                        }
-
+                    <div class="recommendation-label">
+                        Recommended Match
                     </div>
 
-                `;
-            }
-        );
+                    <h3>
+                        ${escapeHtml(
+                            job.title ||
+                            job.role ||
+                            ""
+                        )}
+                    </h3>
+
+                    ${
+                        job.company
+                            ? `
+                                <p>
+                                    ${escapeHtml(
+                                        job.company
+                                    )}
+                                </p>
+                            `
+                            : ""
+                    }
+
+                    ${
+                        job.matchScore !==
+                        undefined
+                            ? `
+                                <strong>
+                                    ${job.matchScore}% skill match
+                                </strong>
+                            `
+                            : ""
+                    }
+
+                </div>
+            `;
+        });
     }
 
-
-    /* ============================================================
-       PROFILE
-       ============================================================ */
-
     function initProfile() {
-
         const form =
             $("profile-form");
 
-
-        if (!form) {
-            return;
-        }
-
+        if (!form) return;
 
         form.addEventListener(
             "submit",
-            async event => {
-
+            async function (event) {
                 event.preventDefault();
-
 
                 const data =
                     Object.fromEntries(
-                        new FormData(
-                            form
-                        ).entries()
+                        new FormData(form).entries()
                     );
-
 
                 const button =
                     form.querySelector(
                         "button[type='submit']"
                     );
 
-
                 const message =
                     $("profile-message");
-
 
                 setButtonLoading(
                     button,
@@ -3045,42 +2032,32 @@
                     "Save Changes"
                 );
 
-
                 try {
-
                     const result =
                         await apiRequest(
                             "update_profile",
                             data
                         );
 
-
                     if (result.user) {
                         state.user =
                             result.user;
                     }
 
-
                     showMessage(
                         message,
                         result.message ||
-                        "Profile updated successfully.",
+                            "Profile updated successfully.",
                         "success"
                     );
-
-
                 } catch (error) {
-
                     showMessage(
                         message,
                         error.message ||
-                        "Unable to update profile.",
+                            "Unable to update profile.",
                         "error"
                     );
-
-
                 } finally {
-
                     setButtonLoading(
                         button,
                         false,
@@ -3091,26 +2068,15 @@
         );
     }
 
-
-    /* ============================================================
-       ROADMAP
-       ============================================================ */
-
     async function loadRoadmap() {
-
         const container =
             $("roadmap-content") ||
             $("roadmap-container") ||
             $("roadmap-results");
 
-
-        if (!container) {
-            return;
-        }
-
+        if (!container) return;
 
         if (!state.targetRole) {
-
             container.innerHTML = `
                 <div class="empty-state">
                     Select a job from your career URL first.
@@ -3120,16 +2086,13 @@
             return;
         }
 
-
         container.innerHTML = `
             <div class="loading-state">
                 Generating roadmap...
             </div>
         `;
 
-
         try {
-
             const result =
                 await apiRequest(
                     "get_roadmap",
@@ -3145,20 +2108,15 @@
                     }
                 );
 
-
             const roadmap =
                 result.roadmap ||
                 result.data ||
                 result.result ||
                 [];
 
-
             if (
-                Array.isArray(
-                    roadmap
-                )
-            {
-
+                Array.isArray(roadmap)
+            ) {
                 container.innerHTML =
                     roadmap
                         .map(
@@ -3171,7 +2129,6 @@
                                     </div>
 
                                     <div>
-
                                         <h4>
                                             ${escapeHtml(
                                                 item.title ||
@@ -3188,23 +2145,17 @@
                                                 ""
                                             )}
                                         </p>
-
                                     </div>
 
                                 </div>
                                 `
                         )
                         .join("");
-
             } else {
-
                 container.textContent =
-                    text(roadmap);
+                    String(roadmap);
             }
-
-
         } catch (error) {
-
             container.innerHTML = `
                 <div class="form-message error">
                     ${escapeHtml(
@@ -3215,26 +2166,15 @@
         }
     }
 
-
-    /* ============================================================
-       INTERVIEW
-       ============================================================ */
-
     async function loadInterview() {
-
         const container =
             $("interview-content") ||
             $("interview-container") ||
             $("interview-results");
 
-
-        if (!container) {
-            return;
-        }
-
+        if (!container) return;
 
         if (!state.targetRole) {
-
             container.innerHTML = `
                 <div class="empty-state">
                     Select a job from your career URL first.
@@ -3244,16 +2184,13 @@
             return;
         }
 
-
         container.innerHTML = `
             <div class="loading-state">
                 Preparing interview questions...
             </div>
         `;
 
-
         try {
-
             const result =
                 await apiRequest(
                     "get_interview",
@@ -3269,25 +2206,19 @@
                     }
                 );
 
-
             const questions =
                 result.questions ||
                 result.interview_questions ||
                 result.data ||
                 [];
 
-
             if (
-                Array.isArray(
-                    questions
-                )
-            {
-
+                Array.isArray(questions)
+            ) {
                 container.innerHTML =
                     questions
                         .map(
                             (question, index) => {
-
                                 const value =
                                     typeof question ===
                                     "string"
@@ -3298,9 +2229,7 @@
                                             ""
                                         );
 
-
                                 return `
-
                                     <div class="interview-question">
 
                                         <strong>
@@ -3314,21 +2243,15 @@
                                         </p>
 
                                     </div>
-
                                 `;
                             }
                         )
                         .join("");
-
             } else {
-
                 container.textContent =
-                    text(questions);
+                    String(questions);
             }
-
-
         } catch (error) {
-
             container.innerHTML = `
                 <div class="form-message error">
                     ${escapeHtml(
@@ -3339,29 +2262,20 @@
         }
     }
 
-
-    /* ============================================================
-       AI INTERVIEW
-       ============================================================ */
-
     function initAIInterview() {
-
         const button =
             $("ai-interview-submit") ||
             $("btn-ai-interview") ||
             $("ask-ai-btn");
 
-
         const input =
             $("ai-interview-question") ||
             $("interview-question-input");
-
 
         const output =
             $("ai-interview-answer") ||
             $("ai-response") ||
             $("ai-interview-output");
-
 
         if (
             !button ||
@@ -3371,22 +2285,15 @@
             return;
         }
 
-
         button.addEventListener(
             "click",
-            async event => {
-
+            async function (event) {
                 event.preventDefault();
-
 
                 const question =
                     input.value.trim();
 
-
-                if (!question) {
-                    return;
-                }
-
+                if (!question) return;
 
                 setButtonLoading(
                     button,
@@ -3394,9 +2301,7 @@
                     "Ask AI"
                 );
 
-
                 try {
-
                     const result =
                         await apiRequest(
                             "ask_interview_ai",
@@ -3411,22 +2316,15 @@
                             }
                         );
 
-
                     output.textContent =
                         result.answer ||
                         result.response ||
                         result.message ||
                         "No response received.";
-
-
                 } catch (error) {
-
                     output.textContent =
                         error.message;
-
-
                 } finally {
-
                     setButtonLoading(
                         button,
                         false,
@@ -3437,95 +2335,28 @@
         );
     }
 
-
-    /* ============================================================
-       ROADMAP / INTERVIEW BUTTONS
-       ============================================================ */
-
     function initFeatureButtons() {
+        qsa(
+            "#roadmap-btn, [data-action='roadmap'], .roadmap-btn"
+        ).forEach(button => {
+            button.addEventListener(
+                "click",
+                loadRoadmap
+            );
+        });
 
         qsa(
-            "#roadmap-btn, " +
-            "[data-action='roadmap'], " +
-            ".roadmap-btn"
-        ).forEach(
-            button => {
-
-                button.addEventListener(
-                    "click",
-                    loadRoadmap
-                );
-            }
-        );
-
-
-        qsa(
-            "#interview-btn, " +
-            "[data-action='interview'], " +
-            ".interview-btn"
-        ).forEach(
-            button => {
-
-                button.addEventListener(
-                    "click",
-                    loadInterview
-                );
-            }
-        );
+            "#interview-btn, [data-action='interview'], .interview-btn"
+        ).forEach(button => {
+            button.addEventListener(
+                "click",
+                loadInterview
+            );
+        });
     }
-
-
-    /* ============================================================
-       REMOVE OLD PREDEFINED TARGET CONTROLS
-       ============================================================ */
-
-    function removeOldTargetControls() {
-
-        const selectors = [
-
-            "#company-select",
-
-            "#companySelect",
-
-            "#role-select",
-
-            "#roleSelect",
-
-            "#benchmark-company",
-
-            "#benchmark-role",
-
-            "#benchmark-company-select",
-
-            "#benchmark-role-select"
-        ];
-
-
-        selectors.forEach(
-            selector => {
-
-                qsa(selector).forEach(
-                    element => {
-
-                        element.style.display =
-                            "none";
-                    }
-                );
-            }
-        );
-    }
-
-
-    /* ============================================================
-       LOAD EXISTING JOBS
-       ============================================================ */
 
     function loadExistingJobs() {
-
-        if (!state.loggedIn) {
-            return;
-        }
-
+        if (!state.loggedIn) return;
 
         if (
             Array.isArray(
@@ -3533,12 +2364,10 @@
             ) &&
             APP.careerJobs.length
         ) {
-
             state.careerJobs =
                 normalizeJobs(
                     APP.careerJobs
                 );
-
 
             renderJobs(
                 state.careerJobs
@@ -3546,13 +2375,7 @@
         }
     }
 
-
-    /* ============================================================
-       INITIAL TARGET
-       ============================================================ */
-
     function initializeTarget() {
-
         state.targetCompany =
             APP.targetCompany || "";
 
@@ -3574,78 +2397,64 @@
                 APP.atsScore || 0
             );
 
-
-        if (
-            APP.recommendedJob
-        ) {
-
+        if (APP.recommendedJob) {
             state.recommendedJob =
                 normalizeJob(
                     APP.recommendedJob
                 );
         }
 
-
         updateTargetUI();
-
         renderSkills();
-
         renderATS();
-
 
         if (
             state.recommendedJob
         ) {
-
             renderRecommendation(
                 state.recommendedJob
             );
         }
     }
 
+    function hideCareerElementsWhenLoggedOut() {
+        if (state.loggedIn) return;
 
-    /* ============================================================
-       SAFE INITIALIZER
-       ============================================================ */
+        const selectors = [
+            "#career-url-panel",
+            "#career-url-section",
+            "#career-url-container",
+            "#career-scraper",
+            "#dynamic-career-panel",
+            ".career-url-panel",
+            ".career-scraper",
+            "#career-url",
+            "#dynamic-career-url"
+        ];
 
-    function safeInit(
-        name,
-        callback
-    ) {
+        selectors.forEach(selector => {
+            qsa(selector).forEach(element => {
+                element.style.display =
+                    "none";
+            });
+        });
+    }
 
+    function safeInit(name, callback) {
         try {
-
             callback();
-
         } catch (error) {
-
             console.error(
                 "Skill Gap Predictor - " +
-                name +
-                ":",
+                    name +
+                    ":",
                 error
             );
         }
     }
 
-
-    /* ============================================================
-       START APPLICATION
-       ============================================================ */
-
     function boot() {
-
-        /*
-         * FIRST:
-         * Remove loading screen.
-         */
-
         hideLoadingScreen();
-
-
-        /*
-         * Login/signup features must always load.
-         */
 
         safeInit(
             "Auth Tabs",
@@ -3672,11 +2481,6 @@
             initThemeToggle
         );
 
-
-        /*
-         * Logged-in navigation.
-         */
-
         safeInit(
             "Navigation",
             initNavigation
@@ -3687,97 +2491,61 @@
             initMobileMenu
         );
 
-
         if (state.loggedIn) {
-
-            /*
-             * ONLY logged-in users get Career URL.
-             */
-
             safeInit(
                 "Career URL",
                 initCareerURL
             );
-
 
             safeInit(
                 "Resume Upload",
                 initResumeUpload
             );
 
-
             safeInit(
                 "Profile",
                 initProfile
             );
 
-
             safeInit(
-                "Features",
+                "Feature Buttons",
                 initFeatureButtons
             );
-
 
             safeInit(
                 "AI Interview",
                 initAIInterview
             );
 
-
             safeInit(
                 "Target",
                 initializeTarget
             );
 
-
             safeInit(
                 "Existing Jobs",
                 loadExistingJobs
             );
-
-
         } else {
-
-            /*
-             * Logged-out page.
-             */
-
             safeInit(
-                "Login Page Cleanup",
+                "Logged Out Cleanup",
                 hideCareerElementsWhenLoggedOut
             );
         }
 
-
-        /*
-         * FINAL SAFETY:
-         * Never leave loading screen visible.
-         */
-
         hideLoadingScreen();
     }
-
-
-    /* ============================================================
-       START
-       ============================================================ */
 
     if (
         document.readyState ===
         "loading"
     ) {
-
         document.addEventListener(
             "DOMContentLoaded",
             boot,
-            {
-                once: true
-            }
+            { once: true }
         );
-
     } else {
-
         boot();
     }
-
 })();
