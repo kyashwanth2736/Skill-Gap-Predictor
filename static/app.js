@@ -1,10 +1,9 @@
 /* ============================================================
    SKILL-GAP PREDICTOR
-   MAIN APPLICATION JAVASCRIPT
+   COMPLETE FRONTEND APPLICATION JAVASCRIPT
    ============================================================ */
 
 document.addEventListener("DOMContentLoaded", function () {
-
     "use strict";
 
     /* ========================================================
@@ -16,7 +15,6 @@ document.addEventListener("DOMContentLoaded", function () {
         user: window.APP_DATA?.user || null,
 
         careerUrl: window.APP_DATA?.careerUrl || "",
-
         careerJobs: Array.isArray(window.APP_DATA?.careerJobs)
             ? window.APP_DATA.careerJobs
             : [],
@@ -34,14 +32,15 @@ document.addEventListener("DOMContentLoaded", function () {
         targetCompany: window.APP_DATA?.targetCompany || "",
         targetRole: window.APP_DATA?.targetRole || "",
 
-        recommendedJob:
-            window.APP_DATA?.recommendedJob || null,
+        recommendedJob: window.APP_DATA?.recommendedJob || null,
 
         currentView: "dashboard",
-
         selectedResume: null,
 
-        charts: {}
+        charts: {
+            radar: null,
+            pie: null
+        }
     };
 
 
@@ -53,68 +52,59 @@ document.addEventListener("DOMContentLoaded", function () {
         return document.getElementById(id);
     }
 
-
-    function qs(selector, parent = document) {
-        return parent.querySelector(selector);
+    function qs(selector) {
+        return document.querySelector(selector);
     }
 
-
-    function qsa(selector, parent = document) {
-        return Array.from(parent.querySelectorAll(selector));
+    function qsa(selector) {
+        return Array.from(document.querySelectorAll(selector));
     }
-
 
     function escapeHtml(value) {
+        if (value === null || value === undefined) {
+            return "";
+        }
 
-        const div =
-            document.createElement("div");
-
-        div.textContent =
-            value == null ? "" : String(value);
-
-        return div.innerHTML;
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
-
-    function normalizeSkill(skill) {
-
-        return String(skill || "")
+    function normalizeSkill(value) {
+        return String(value || "")
             .trim()
-            .toLowerCase()
-            .replace(/[._/-]+/g, " ")
             .replace(/\s+/g, " ");
     }
 
-
     function normalizeSkills(skills) {
-
         if (!Array.isArray(skills)) {
             return [];
         }
 
         const result = [];
-        const seen = new Set();
 
         skills.forEach(function (skill) {
+            let value = "";
 
-            if (skill == null) {
-                return;
+            if (typeof skill === "string") {
+                value = skill;
+            } else if (skill && typeof skill === "object") {
+                value =
+                    skill.name ||
+                    skill.skill ||
+                    skill.title ||
+                    skill.value ||
+                    "";
             }
 
-            const value =
-                String(skill).trim();
+            value = normalizeSkill(value);
 
-            if (!value) {
-                return;
-            }
-
-            const normalized =
-                normalizeSkill(value);
-
-            if (!seen.has(normalized)) {
-
-                seen.add(normalized);
-
+            if (value && !result.some(function (x) {
+                return x.toLowerCase() === value.toLowerCase();
+            })) {
                 result.push(value);
             }
         });
@@ -122,391 +112,326 @@ document.addEventListener("DOMContentLoaded", function () {
         return result;
     }
 
-
-    function showMessage(
-        element,
-        message,
-        type = "info"
-    ) {
-
-        if (!element) {
-            return;
+    function showElement(element) {
+        if (element) {
+            element.style.display = "";
         }
-
-        element.textContent =
-            message;
-
-        element.className =
-            "auth-message " + type;
-
-        element.style.display =
-            "block";
     }
 
-
-    function hideMessage(element) {
-
-        if (!element) {
-            return;
-        }
-
-        element.textContent =
-            "";
-
-        element.style.display =
-            "none";
-    }
-
-
-    function setLoading(
-        button,
-        loading,
-        loadingText = "Loading..."
-    ) {
-
-        if (!button) {
-            return;
-        }
-
-        if (loading) {
-
-            if (!button.dataset.originalText) {
-
-                button.dataset.originalText =
-                    button.textContent.trim();
-            }
-
-            button.disabled =
-                true;
-
-            button.classList.add(
-                "loading"
-            );
-
-            button.textContent =
-                loadingText;
-
-        } else {
-
-            button.disabled =
-                false;
-
-            button.classList.remove(
-                "loading"
-            );
-
-            if (button.dataset.originalText) {
-
-                button.textContent =
-                    button.dataset.originalText;
-            }
+    function hideElement(element) {
+        if (element) {
+            element.style.display = "none";
         }
     }
 
 
     /* ========================================================
-       CUSTOM POPUP
+       POPUP SYSTEM
        ======================================================== */
 
-    function ensurePopupStyles() {
-
-        if ($("sgp-popup-styles")) {
+    function ensurePopup() {
+        if ($("sg-popup-overlay")) {
             return;
         }
 
-        const style =
-            document.createElement("style");
+        const overlay = document.createElement("div");
 
-        style.id =
-            "sgp-popup-styles";
+        overlay.id = "sg-popup-overlay";
+
+        overlay.innerHTML = `
+            <div class="sg-popup-card">
+                <button type="button"
+                        id="sg-popup-close"
+                        class="sg-popup-close">
+                    ×
+                </button>
+
+                <div id="sg-popup-icon"
+                     class="sg-popup-icon">
+                    ✓
+                </div>
+
+                <h3 id="sg-popup-title">
+                    Message
+                </h3>
+
+                <p id="sg-popup-message">
+                    Message
+                </p>
+
+                <button type="button"
+                        id="sg-popup-ok"
+                        class="btn">
+                    OK
+                </button>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const style = document.createElement("style");
+
+        style.id = "sg-popup-style";
 
         style.textContent = `
-            .sgp-popup-overlay {
+            #sg-popup-overlay {
                 position: fixed;
                 inset: 0;
-                background: rgba(0,0,0,.45);
-                backdrop-filter: blur(5px);
-                display: flex;
+                z-index: 999999;
+                display: none;
                 align-items: center;
                 justify-content: center;
-                z-index: 99999;
+                background: rgba(0,0,0,.72);
+                backdrop-filter: blur(5px);
                 padding: 20px;
-                animation: sgpFadeIn .2s ease;
             }
 
-            .sgp-popup {
-                width: min(430px, 100%);
-                background: var(--card-bg, #ffffff);
-                color: var(--text-main, #111827);
-                border-radius: 20px;
-                padding: 28px;
-                box-shadow: 0 25px 70px rgba(0,0,0,.25);
-                border: 1px solid rgba(148,163,184,.25);
+            .sg-popup-card {
+                position: relative;
+                width: min(440px, 95vw);
+                padding: 30px 26px;
+                border-radius: 18px;
                 text-align: center;
-                animation: sgpPopupIn .25s ease;
+                background: var(--card-bg, #111827);
+                color: var(--text-main, #f8fafc);
+                border: 1px solid rgba(148,163,184,.25);
+                box-shadow: 0 25px 70px rgba(0,0,0,.5);
             }
 
-            .sgp-popup-icon {
-                width: 62px;
-                height: 62px;
+            .sg-popup-close {
+                position: absolute;
+                right: 15px;
+                top: 10px;
+                border: 0;
+                background: transparent;
+                color: #94a3b8;
+                font-size: 27px;
+                cursor: pointer;
+            }
+
+            .sg-popup-icon {
+                width: 58px;
+                height: 58px;
+                margin: 0 auto 15px;
                 border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                margin: 0 auto 18px;
-                font-size: 30px;
+                font-size: 27px;
                 font-weight: 800;
+                background: rgba(16,185,129,.15);
+                color: #34d399;
             }
 
-            .sgp-popup.success .sgp-popup-icon {
-                background: rgba(34,197,94,.14);
-                color: #16a34a;
-            }
-
-            .sgp-popup.error .sgp-popup-icon {
-                background: rgba(239,68,68,.14);
-                color: #dc2626;
-            }
-
-            .sgp-popup.warning .sgp-popup-icon {
-                background: rgba(245,158,11,.14);
-                color: #d97706;
-            }
-
-            .sgp-popup.info .sgp-popup-icon {
-                background: rgba(59,130,246,.14);
-                color: #2563eb;
-            }
-
-            .sgp-popup h3 {
-                margin: 0 0 9px;
+            .sg-popup-card h3 {
+                margin: 0 0 10px;
                 font-size: 21px;
             }
 
-            .sgp-popup p {
-                margin: 0;
+            .sg-popup-card p {
+                margin: 0 0 22px;
+                color: #94a3b8;
                 line-height: 1.6;
-                opacity: .82;
             }
 
-            .sgp-popup-button {
-                width: 100%;
-                margin-top: 22px;
-                border: 0;
-                border-radius: 11px;
-                padding: 12px 18px;
-                font-weight: 700;
-                cursor: pointer;
-                background: #2563eb;
-                color: white;
-            }
-
-            .sgp-popup-button:hover {
-                opacity: .92;
-            }
-
-            @keyframes sgpFadeIn {
-                from {
-                    opacity: 0;
-                }
-
-                to {
-                    opacity: 1;
-                }
-            }
-
-            @keyframes sgpPopupIn {
-                from {
-                    opacity: 0;
-                    transform: translateY(12px) scale(.97);
-                }
-
-                to {
-                    opacity: 1;
-                    transform: translateY(0) scale(1);
-                }
+            .sg-popup-card .btn {
+                min-width: 110px;
             }
         `;
 
         document.head.appendChild(style);
-    }
 
-
-    function showPopup(
-        title,
-        message,
-        type = "info",
-        buttonText = "OK",
-        callback = null
-    ) {
-
-        ensurePopupStyles();
-
-        const existing =
-            $("sgp-popup-overlay");
-
-        if (existing) {
-            existing.remove();
-        }
-
-        const overlay =
-            document.createElement("div");
-
-        overlay.id =
-            "sgp-popup-overlay";
-
-        overlay.className =
-            "sgp-popup-overlay";
-
-        let icon = "i";
-
-        if (type === "success") {
-            icon = "✓";
-        } else if (
-            type === "error" ||
-            type === "warning"
-        ) {
-            icon = "!";
-        }
-
-        overlay.innerHTML = `
-            <div class="sgp-popup ${escapeHtml(type)}">
-
-                <div class="sgp-popup-icon">
-                    ${escapeHtml(icon)}
-                </div>
-
-                <h3>
-                    ${escapeHtml(title)}
-                </h3>
-
-                <p>
-                    ${escapeHtml(message)}
-                </p>
-
-                <button
-                    type="button"
-                    class="sgp-popup-button"
-                    id="sgp-popup-ok"
-                >
-                    ${escapeHtml(buttonText)}
-                </button>
-
-            </div>
-        `;
-
-        document.body.appendChild(
-            overlay
-        );
-
-
-        const closePopup =
-            function () {
-
-                overlay.remove();
-
-                if (
-                    typeof callback ===
-                    "function"
-                ) {
-                    callback();
-                }
-            };
-
-
-        const ok =
-            $("sgp-popup-ok");
-
-        if (ok) {
-
-            ok.addEventListener(
-                "click",
-                closePopup
-            );
-        }
-
-
-        overlay.addEventListener(
+        $("sg-popup-close").addEventListener(
             "click",
-            function (event) {
-
-                if (
-                    event.target === overlay
-                ) {
-                    closePopup();
-                }
-            }
+            hidePopup
         );
+
+        $("sg-popup-ok").addEventListener(
+            "click",
+            hidePopup
+        );
+
+        overlay.addEventListener("click", function (event) {
+            if (event.target === overlay) {
+                hidePopup();
+            }
+        });
     }
 
+    function showPopup(title, message, type) {
+        ensurePopup();
 
-    window.alert =
-        function (message) {
+        const overlay = $("sg-popup-overlay");
+        const titleElement = $("sg-popup-title");
+        const messageElement = $("sg-popup-message");
+        const iconElement = $("sg-popup-icon");
 
+        if (!overlay) {
+            return;
+        }
+
+        titleElement.textContent = title || "Message";
+        messageElement.textContent = message || "";
+
+        if (type === "error") {
+            iconElement.textContent = "!";
+            iconElement.style.color = "#fb7185";
+            iconElement.style.background = "rgba(244,63,94,.15)";
+        } else if (type === "warning") {
+            iconElement.textContent = "!";
+            iconElement.style.color = "#fbbf24";
+            iconElement.style.background = "rgba(245,158,11,.15)";
+        } else {
+            iconElement.textContent = "✓";
+            iconElement.style.color = "#34d399";
+            iconElement.style.background = "rgba(16,185,129,.15)";
+        }
+
+        overlay.style.display = "flex";
+    }
+
+    function hidePopup() {
+        const overlay = $("sg-popup-overlay");
+
+        if (overlay) {
+            overlay.style.display = "none";
+        }
+    }
+
+    window.showSkillGapPopup = showPopup;
+
+    const nativeAlert = window.alert;
+
+    window.alert = function (message) {
+        try {
             showPopup(
                 "Skill-Gap Predictor",
                 String(message || ""),
                 "info"
             );
-        };
+        } catch (error) {
+            nativeAlert(message);
+        }
+    };
 
 
     /* ========================================================
-       API
+       LOADING SYSTEM
        ======================================================== */
 
-    async function apiRequest(
-        action,
-        data = {},
-        options = {}
-    ) {
+    function setLoading(button, loading, text) {
+        if (!button) {
+            return;
+        }
+
+        if (loading) {
+            if (!button.dataset.originalText) {
+                button.dataset.originalText =
+                    button.innerHTML;
+            }
+
+            button.disabled = true;
+
+            button.innerHTML =
+                `<span class="button-loading"></span> ${escapeHtml(
+                    text || "Processing..."
+                )}`;
+        } else {
+            button.disabled = false;
+
+            if (button.dataset.originalText) {
+                button.innerHTML =
+                    button.dataset.originalText;
+
+                delete button.dataset.originalText;
+            }
+        }
+    }
+
+    function hidePageLoader() {
+        const loader = $("page-loader");
+
+        if (!loader) {
+            return;
+        }
+
+        loader.classList.add("loaded");
+
+        setTimeout(function () {
+            loader.style.display = "none";
+        }, 300);
+    }
+
+    window.addEventListener(
+        "load",
+        hidePageLoader
+    );
+
+    setTimeout(
+        hidePageLoader,
+        3000
+    );
+
+
+    /* ========================================================
+       API REQUEST
+       ======================================================== */
+
+    async function apiRequest(action, data, options) {
+        data = data || {};
+        options = options || {};
 
         const method =
-            options.method || "POST";
+            String(options.method || "POST").toUpperCase();
 
         let url =
             "api.php?action=" +
             encodeURIComponent(action);
 
         const fetchOptions = {
-
             method: method,
-
-            credentials:
-                "same-origin",
-
-            cache:
-                "no-store",
-
+            credentials: "same-origin",
+            cache: "no-store",
             headers: {}
         };
 
+        if (method === "GET") {
+            const params = new URLSearchParams();
 
-        if (
-            method.toUpperCase() ===
-            "GET"
-        ) {
+            Object.keys(data).forEach(function (key) {
+                if (
+                    data[key] !== undefined &&
+                    data[key] !== null
+                ) {
+                    params.append(
+                        key,
+                        String(data[key])
+                    );
+                }
+            });
 
-            const params =
-                new URLSearchParams(data);
-
-            const query =
-                params.toString();
+            const query = params.toString();
 
             if (query) {
                 url += "&" + query;
             }
-
         } else {
-
-            if (
-                data instanceof FormData
-            ) {
-
-                fetchOptions.body =
-                    data;
-
+            if (data instanceof FormData) {
+                fetchOptions.body = data;
             } else {
+                const params = new URLSearchParams();
+
+                Object.keys(data).forEach(function (key) {
+                    if (
+                        data[key] !== undefined &&
+                        data[key] !== null
+                    ) {
+                        params.append(
+                            key,
+                            String(data[key])
+                        );
+                    }
+                });
 
                 fetchOptions.headers[
                     "Content-Type"
@@ -514,37 +439,24 @@ document.addEventListener("DOMContentLoaded", function () {
                     "application/x-www-form-urlencoded;charset=UTF-8";
 
                 fetchOptions.body =
-                    new URLSearchParams(
-                        data
-                    ).toString();
+                    params.toString();
             }
         }
 
-
         const response =
-            await fetch(
-                url,
-                fetchOptions
-            );
+            await fetch(url, fetchOptions);
 
-
-        const text =
+        const responseText =
             await response.text();
-
 
         let result;
 
-
         try {
-
-            result =
-                JSON.parse(text);
-
+            result = JSON.parse(responseText);
         } catch (error) {
-
             console.error(
                 "Invalid API response:",
-                text
+                responseText
             );
 
             throw new Error(
@@ -552,9 +464,7 @@ document.addEventListener("DOMContentLoaded", function () {
             );
         }
 
-
         if (!response.ok) {
-
             throw new Error(
                 result.message ||
                 result.error ||
@@ -562,793 +472,437 @@ document.addEventListener("DOMContentLoaded", function () {
             );
         }
 
-
         return result;
     }
 
-
     function apiSuccess(result) {
-
-        if (!result) {
-            return false;
-        }
-
-        return (
-            result.success === true ||
-            result.status === "success" ||
-            result.ok === true
+        return Boolean(
+            result &&
+            (
+                result.success === true ||
+                result.status === "success" ||
+                result.ok === true
+            )
         );
     }
 
 
     /* ========================================================
-       AUTHENTICATED DASHBOARD REDIRECT
+       AUTHENTICATION
        ======================================================== */
 
-    function redirectToDashboard() {
-
-        try {
-
-            const currentUrl =
-                new URL(
-                    window.location.href
-                );
-
-            currentUrl.search = "";
-            currentUrl.hash = "";
-
-            window.location.replace(
-                currentUrl.href
-            );
-
-        } catch (error) {
-
-            window.location.reload();
-        }
-    }
-
-
-    /* ========================================================
-       LOADING SCREEN
-       ======================================================== */
-
-    function hideLoader() {
-
-        const loader =
-            $("page-loader");
-
-        if (!loader) {
-            return;
-        }
-
-        loader.classList.add(
-            "hidden"
-        );
-
-        loader.style.opacity =
-            "0";
-
-        loader.style.visibility =
-            "hidden";
-
-        loader.style.pointerEvents =
-            "none";
-
-
-        window.setTimeout(
-            function () {
-
-                if (loader) {
-
-                    loader.style.display =
-                        "none";
-                }
-
-            },
-            500
-        );
-    }
-
-
-    function initializeLoader() {
-
-        hideLoader();
-
-        window.setTimeout(
-            hideLoader,
-            800
-        );
-
-        window.setTimeout(
-            hideLoader,
-            2500
-        );
-    }
-
-
-    /* ========================================================
-       AUTH TABS
-       ======================================================== */
-
-    function initAuthTabs() {
-
-        const buttons =
-            qsa("[data-auth-tab]");
-
-        if (!buttons.length) {
-            return;
-        }
-
-
-        buttons.forEach(
-            function (button) {
-
-                button.addEventListener(
-                    "click",
-                    function () {
-
-                        const tab =
-                            button.dataset.authTab;
-
-
-                        buttons.forEach(
-                            function (item) {
-
-                                item.classList.remove(
-                                    "active"
-                                );
-                            }
-                        );
-
-
-                        button.classList.add(
-                            "active"
-                        );
-
-
-                        const loginPanel =
-                            $("form-login-box");
-
-                        const signupPanel =
-                            $("form-signup-box");
-
-
-                        if (
-                            tab === "signup"
-                        ) {
-
-                            if (loginPanel) {
-
-                                loginPanel.classList.remove(
-                                    "active"
-                                );
-                            }
-
-                            if (signupPanel) {
-
-                                signupPanel.classList.add(
-                                    "active"
-                                );
-                            }
-
-                        } else {
-
-                            if (signupPanel) {
-
-                                signupPanel.classList.remove(
-                                    "active"
-                                );
-                            }
-
-                            if (loginPanel) {
-
-                                loginPanel.classList.add(
-                                    "active"
-                                );
-                            }
-                        }
-                    }
-                );
-            }
-        );
-    }
-
-
-    function openLoginTab(
-        email = ""
-    ) {
-
-        const loginButton =
+    function initAuth() {
+        const tabLogin =
             $("tab-btn-login");
 
-        const signupButton =
+        const tabSignup =
             $("tab-btn-signup");
 
-        const loginPanel =
+        const formLoginBox =
             $("form-login-box");
 
-        const signupPanel =
+        const formSignupBox =
             $("form-signup-box");
 
+        function showLogin() {
+            if (tabLogin) {
+                tabLogin.classList.add("active");
+            }
 
-        if (loginButton) {
+            if (tabSignup) {
+                tabSignup.classList.remove("active");
+            }
 
-            loginButton.classList.add(
-                "active"
+            showElement(formLoginBox);
+            hideElement(formSignupBox);
+        }
+
+        function showSignup() {
+            if (tabSignup) {
+                tabSignup.classList.add("active");
+            }
+
+            if (tabLogin) {
+                tabLogin.classList.remove("active");
+            }
+
+            showElement(formSignupBox);
+            hideElement(formLoginBox);
+        }
+
+        if (tabLogin) {
+            tabLogin.addEventListener(
+                "click",
+                function (event) {
+                    event.preventDefault();
+                    showLogin();
+                }
             );
         }
 
-
-        if (signupButton) {
-
-            signupButton.classList.remove(
-                "active"
+        if (tabSignup) {
+            tabSignup.addEventListener(
+                "click",
+                function (event) {
+                    event.preventDefault();
+                    showSignup();
+                }
             );
         }
 
-
-        if (loginPanel) {
-
-            loginPanel.classList.add(
-                "active"
-            );
-        }
-
-
-        if (signupPanel) {
-
-            signupPanel.classList.remove(
-                "active"
-            );
-        }
-
-
-        if (
-            email &&
-            $("login_email")
-        ) {
-
-            $("login_email").value =
-                email;
-        }
-
-
-        if ($("login_password")) {
-
-            setTimeout(
-                function () {
-
-                    $("login_password").focus();
-
-                },
-                100
-            );
-        }
-    }
-
-
-    /* ========================================================
-       LOGIN
-       ======================================================== */
-
-    function initLogin() {
-
-        const form =
+        const loginForm =
             $("form-login");
 
-        if (!form) {
-            return;
-        }
-
-
-        form.addEventListener(
-            "submit",
-            async function (event) {
-
-                event.preventDefault();
-
-
-                const email =
-                    $("login_email")?.value.trim() ||
-                    "";
-
-                const password =
-                    $("login_password")?.value ||
-                    "";
-
-
-                const errorBox =
-                    $("login-error-msg");
-
-                const successBox =
-                    $("login-success-msg");
-
-
-                hideMessage(
-                    errorBox
-                );
-
-                hideMessage(
-                    successBox
-                );
-
-
-                if (!email) {
-
-                    showMessage(
-                        errorBox,
-                        "Please enter your email address.",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                if (!password) {
-
-                    showMessage(
-                        errorBox,
-                        "Please enter your password.",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                const button =
-                    $("btn-do-login");
-
-
-                setLoading(
-                    button,
-                    true,
-                    "Signing in..."
-                );
-
-
-                try {
-
-                    const result =
-                        await apiRequest(
-                            "login",
-                            {
-                                email:
-                                    email,
-
-                                password:
-                                    password
-                            }
-                        );
-
-
-                    console.log(
-                        "Login response:",
-                        result
-                    );
-
-
-                    if (
-                        !apiSuccess(result)
-                    ) {
-
-                        throw new Error(
-                            result.message ||
-                            result.error ||
-                            "Login failed."
-                        );
-                    }
-
-
-                    state.loggedIn =
-                        true;
-
-                    state.user =
-                        result.user ||
-                        null;
-
-
-                    showMessage(
-                        successBox,
-                        "Login successful. Redirecting to dashboard...",
-                        "success"
-                    );
-
-
-                    window.setTimeout(
-                        function () {
-
-                            redirectToDashboard();
-
-                        },
-                        350
-                    );
-
-
-                } catch (error) {
-
-                    console.error(
-                        "Login error:",
-                        error
-                    );
-
-
-                    showMessage(
-                        errorBox,
-                        error.message ||
-                        "Unable to login.",
-                        "error"
-                    );
-
-
-                } finally {
-
-                    setLoading(
-                        button,
-                        false
-                    );
-                }
-            }
-        );
-    }
-
-
-    /* ========================================================
-       SIGNUP
-       ======================================================== */
-
-    function initSignup() {
-
-        const form =
-            $("form-signup");
-
-        if (!form) {
-            return;
-        }
-
-
-        form.addEventListener(
-            "submit",
-            async function (event) {
-
-                event.preventDefault();
-
-
-                const name =
-                    $("signup_name")?.value.trim() ||
-                    "";
-
-                const email =
-                    $("signup_email")?.value.trim() ||
-                    "";
-
-                const password =
-                    $("signup_pwd")?.value ||
-                    "";
-
-                const university =
-                    $("signup_uni")?.value.trim() ||
-                    "";
-
-                const branch =
-                    $("signup_branch")?.value.trim() ||
-                    "";
-
-                const major =
-                    $("signup_major")?.value.trim() ||
-                    "";
-
-                const gradyear =
-                    $("signup_gradyear")?.value.trim() ||
-                    "";
-
-                const linkedin =
-                    $("signup_linkedin")?.value.trim() ||
-                    "";
-
-                const github =
-                    $("signup_github")?.value.trim() ||
-                    "";
-
-                const terms =
-                    $("signup-terms")?.checked ||
-                    false;
-
-
-                const errorBox =
-                    $("signup-error-msg");
-
-                const successBox =
-                    $("signup-success-msg");
-
-
-                hideMessage(
-                    errorBox
-                );
-
-                hideMessage(
-                    successBox
-                );
-
-
-                if (!name) {
-
-                    showMessage(
-                        errorBox,
-                        "Please enter your full name.",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                if (!email) {
-
-                    showMessage(
-                        errorBox,
-                        "Please enter your email address.",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                if (!password) {
-
-                    showMessage(
-                        errorBox,
-                        "Please create a password.",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                if (password.length < 6) {
-
-                    showMessage(
-                        errorBox,
-                        "Password must contain at least 6 characters.",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                if (!terms) {
-
-                    showMessage(
-                        errorBox,
-                        "Please accept the terms and conditions.",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                const button =
-                    $("btn-do-signup");
-
-
-                setLoading(
-                    button,
-                    true,
-                    "Creating Account..."
-                );
-
-
-                try {
-
-                    const result =
-                        await apiRequest(
-                            "register",
-                            {
-                                name:
-                                    name,
-
-                                email:
-                                    email,
-
-                                password:
-                                    password,
-
-                                university:
-                                    university,
-
-                                branch:
-                                    branch,
-
-                                major:
-                                    major,
-
-                                gradyear:
-                                    gradyear,
-
-                                linkedin:
-                                    linkedin,
-
-                                github:
-                                    github
-                            }
-                        );
-
-
-                    console.log(
-                        "Registration response:",
-                        result
-                    );
-
-
-                    const resultCode =
-                        String(
-                            result.error_code ||
-                            result.code ||
-                            result.status_code ||
-                            ""
-                        ).toUpperCase();
-
-
-                    const message =
-                        String(
-                            result.message ||
-                            result.error ||
-                            ""
-                        );
-
-
-                    const duplicate =
-                        resultCode ===
-                            "ACCOUNT_EXISTS" ||
-
-                        resultCode ===
-                            "EMAIL_EXISTS" ||
-
-                        resultCode ===
-                            "DUPLICATE" ||
-
-                        result.accountExists ===
-                            true ||
-
-                        /already|exist|duplicate|taken|registered/i
-                            .test(message);
-
-
-                    if (duplicate) {
-
-                        showPopup(
-                            "Account Already Exists",
-                            "An account with this email address already exists. Please login using your existing account.",
-                            "warning",
-                            "Go to Login",
-                            function () {
-
-                                openLoginTab(
-                                    email
-                                );
-                            }
-                        );
+        if (loginForm) {
+            loginForm.addEventListener(
+                "submit",
+                async function (event) {
+                    event.preventDefault();
+
+                    const emailElement =
+                        $("login_email");
+
+                    const passwordElement =
+                        $("login_password");
+
+                    const errorElement =
+                        $("login-error-msg");
+
+                    const successElement =
+                        $("login-success-msg");
+
+                    const button =
+                        $("btn-do-login");
+
+                    const email =
+                        emailElement
+                            ? emailElement.value.trim()
+                            : "";
+
+                    const password =
+                        passwordElement
+                            ? passwordElement.value
+                            : "";
+
+                    if (!email || !password) {
+                        if (errorElement) {
+                            errorElement.textContent =
+                                "Please enter both email and password.";
+
+                            errorElement.style.display =
+                                "block";
+                        }
 
                         return;
                     }
 
-
-                    if (!apiSuccess(result)) {
-
-                        throw new Error(
-                            message ||
-                            "Unable to create your account."
-                        );
+                    if (errorElement) {
+                        errorElement.style.display =
+                            "none";
                     }
-
-
-                    showMessage(
-                        successBox,
-                        "Account registered successfully.",
-                        "success"
-                    );
-
-
-                    form.reset();
-
-
-                    showPopup(
-                        "Account Registered Successfully",
-                        "Your account has been created successfully. Please login to continue.",
-                        "success",
-                        "Go to Login",
-                        function () {
-
-                            openLoginTab(
-                                email
-                            );
-                        }
-                    );
-
-
-                } catch (error) {
-
-                    console.error(
-                        "Registration error:",
-                        error
-                    );
-
-
-                    showMessage(
-                        errorBox,
-                        error.message ||
-                        "Unable to create account.",
-                        "error"
-                    );
-
-
-                } finally {
 
                     setLoading(
                         button,
-                        false
+                        true,
+                        "Signing in..."
+                    );
+
+                    const formData =
+                        new FormData(loginForm);
+
+                    formData.set(
+                        "action",
+                        "login"
+                    );
+
+                    try {
+                        const result =
+                            await apiRequest(
+                                "login",
+                                formData
+                            );
+
+                        if (!apiSuccess(result)) {
+                            throw new Error(
+                                result.message ||
+                                "Login failed."
+                            );
+                        }
+
+                        if (successElement) {
+                            successElement.textContent =
+                                "Login successful. Opening dashboard...";
+
+                            successElement.style.display =
+                                "block";
+                        }
+
+                        /*
+                         * IMPORTANT:
+                         * Reload after the PHP session has been created.
+                         * This prevents the old "login successful -> login page"
+                         * problem caused by only changing frontend state.
+                         */
+                        setTimeout(function () {
+                            window.location.replace(
+                                window.location.pathname +
+                                "?logged_in=1"
+                            );
+                        }, 500);
+
+                    } catch (error) {
+                        if (errorElement) {
+                            errorElement.textContent =
+                                error.message ||
+                                "Unable to sign in.";
+
+                            errorElement.style.display =
+                                "block";
+                        }
+
+                        setLoading(
+                            button,
+                            false
+                        );
+                    }
+                }
+            );
+        }
+
+        const signupForm =
+            $("form-signup");
+
+        if (signupForm) {
+            signupForm.addEventListener(
+                "submit",
+                async function (event) {
+                    event.preventDefault();
+
+                    const errorElement =
+                        $("signup-error-msg");
+
+                    const successElement =
+                        $("signup-success-msg");
+
+                    const button =
+                        $("btn-do-signup");
+
+                    if (errorElement) {
+                        errorElement.style.display =
+                            "none";
+                    }
+
+                    if (successElement) {
+                        successElement.style.display =
+                            "none";
+                    }
+
+                    const name =
+                        $("signup_name")
+                            ?.value.trim() || "";
+
+                    const email =
+                        $("signup_email")
+                            ?.value.trim() || "";
+
+                    const password =
+                        $("signup_pwd")
+                            ?.value || "";
+
+                    const university =
+                        $("signup_uni")
+                            ?.value.trim() || "";
+
+                    const branch =
+                        $("signup_branch")
+                            ?.value.trim() || "";
+
+                    const graduationYear =
+                        (
+                            $("signup_gradyear") ||
+                            $("signup_year")
+                        )?.value || "";
+
+                    const terms =
+                        $("signup-terms");
+
+                    if (
+                        !name ||
+                        !email ||
+                        !password ||
+                        !university ||
+                        !branch ||
+                        !graduationYear
+                    ) {
+                        if (errorElement) {
+                            errorElement.textContent =
+                                "Please fill in all required fields.";
+
+                            errorElement.style.display =
+                                "block";
+                        }
+
+                        return;
+                    }
+
+                    if (
+                        terms &&
+                        !terms.checked
+                    ) {
+                        if (errorElement) {
+                            errorElement.textContent =
+                                "Please accept the terms before creating your account.";
+
+                            errorElement.style.display =
+                                "block";
+                        }
+
+                        return;
+                    }
+
+                    setLoading(
+                        button,
+                        true,
+                        "Creating Account..."
+                    );
+
+                    const formData =
+                        new FormData(signupForm);
+
+                    formData.set(
+                        "action",
+                        "signup"
+                    );
+
+                    formData.set(
+                        "name",
+                        name
+                    );
+
+                    formData.set(
+                        "email",
+                        email
+                    );
+
+                    formData.set(
+                        "password",
+                        password
+                    );
+
+                    formData.set(
+                        "university",
+                        university
+                    );
+
+                    formData.set(
+                        "branch",
+                        branch
+                    );
+
+                    formData.set(
+                        "graduation_year",
+                        graduationYear
+                    );
+
+                    try {
+                        const result =
+                            await apiRequest(
+                                "signup",
+                                formData
+                            );
+
+                        if (!apiSuccess(result)) {
+                            throw new Error(
+                                result.message ||
+                                "Account registration failed."
+                            );
+                        }
+
+                        if (successElement) {
+                            successElement.textContent =
+                                "Account registered successfully.";
+
+                            successElement.style.display =
+                                "block";
+                        }
+
+                        showPopup(
+                            "Account Registered Successfully",
+                            "Your account has been created. Please log in with your new account.",
+                            "success"
+                        );
+
+                        setTimeout(function () {
+                            showLogin();
+
+                            if (emailElementExists()) {
+                                $("login_email").value =
+                                    email;
+                            }
+                        }, 1200);
+
+                    } catch (error) {
+                        if (errorElement) {
+                            errorElement.textContent =
+                                error.message ||
+                                "Unable to create account.";
+
+                            errorElement.style.display =
+                                "block";
+                        }
+
+                        showPopup(
+                            "Registration Failed",
+                            error.message ||
+                            "Unable to create account.",
+                            "error"
+                        );
+                    } finally {
+                        setLoading(
+                            button,
+                            false
+                        );
+                    }
+                }
+            );
+        }
+
+        function emailElementExists() {
+            return Boolean(
+                $("login_email")
+            );
+        }
+
+        const logoutButton =
+            $("btn-logout");
+
+        if (logoutButton) {
+            logoutButton.addEventListener(
+                "click",
+                async function (event) {
+                    event.preventDefault();
+
+                    try {
+                        await apiRequest(
+                            "logout",
+                            {},
+                            {
+                                method: "GET"
+                            }
+                        );
+                    } catch (error) {
+                        console.error(
+                            "Logout error:",
+                            error
+                        );
+                    }
+
+                    window.location.replace(
+                        window.location.pathname
                     );
                 }
-            }
-        );
-    }
-
-
-    /* ========================================================
-       PASSWORD TOGGLE
-       ======================================================== */
-
-    function initPasswordToggles() {
-
-        qsa(
-            "[data-password-target]"
-        ).forEach(
-            function (button) {
-
-                button.addEventListener(
-                    "click",
-                    function () {
-
-                        const targetId =
-                            button.dataset.passwordTarget;
-
-                        const input =
-                            $(targetId);
-
-
-                        if (!input) {
-                            return;
-                        }
-
-
-                        if (
-                            input.type ===
-                            "password"
-                        ) {
-
-                            input.type =
-                                "text";
-
-                            button.textContent =
-                                "Hide";
-
-                        } else {
-
-                            input.type =
-                                "password";
-
-                            button.textContent =
-                                "Show";
-                        }
-                    }
-                );
-            }
-        );
+            );
+        }
     }
 
 
@@ -1356,279 +910,106 @@ document.addEventListener("DOMContentLoaded", function () {
        THEME
        ======================================================== */
 
-    function applyTheme(theme) {
-
-        const html =
-            document.documentElement;
-
-        const body =
-            document.body;
-
-
-        const dark =
-            theme === "dark";
-
-
-        html.classList.toggle(
-            "dark",
-            dark
-        );
-
-        body.classList.toggle(
-            "dark",
-            dark
-        );
-
-        body.classList.toggle(
-            "dark-mode",
-            dark
-        );
-
-
-        localStorage.setItem(
-            "sgp-theme",
-            dark
-                ? "dark"
-                : "light"
-        );
-
-
-        updateThemeButtons(
-            dark
-        );
-    }
-
-
-    function updateThemeButtons(
-        isDark
-    ) {
-
-        const icon =
-            isDark
-                ? "☀"
-                : "☾";
-
-        const text =
-            isDark
-                ? "Light Mode"
-                : "Dark Mode";
-
-
-        const themeIcon =
-            $("theme-icon");
-
-        const themeText =
-            $("theme-text");
-
-        const topTheme =
-            $("top-theme-toggle");
-
-
-        if (themeIcon) {
-
-            themeIcon.textContent =
-                icon;
-        }
-
-
-        if (themeText) {
-
-            themeText.textContent =
-                text;
-        }
-
-
-        if (topTheme) {
-
-            topTheme.textContent =
-                icon;
-        }
-    }
-
-
     function initTheme() {
-
         const savedTheme =
             localStorage.getItem(
-                "sgp-theme"
+                "skillGapTheme"
             );
 
-
-        if (
-            savedTheme ===
-            "dark"
-        ) {
-
-            applyTheme(
-                "dark"
+        if (savedTheme === "dark") {
+            document.body.classList.add(
+                "dark-mode"
             );
 
-        } else if (
-            savedTheme ===
-            "light"
-        ) {
-
-            applyTheme(
-                "light"
-            );
-
-        } else {
-
-            const prefersDark =
-                window.matchMedia &&
-                window.matchMedia(
-                    "(prefers-color-scheme: dark)"
-                ).matches;
-
-
-            applyTheme(
-                prefersDark
-                    ? "dark"
-                    : "light"
+            document.documentElement.classList.add(
+                "dark-mode"
             );
         }
 
-
-        const sidebarButton =
-            $("sidebar-theme-toggle");
-
-        const topButton =
-            $("top-theme-toggle");
-
-
-        function toggle() {
-
-            const isDark =
-                document.body.classList.contains(
-                    "dark-mode"
-                );
-
-
-            applyTheme(
-                isDark
-                    ? "light"
-                    : "dark"
+        const buttons =
+            qsa(
+                "#theme-toggle, #btn-theme-toggle, .theme-toggle"
             );
-        }
 
-
-        if (sidebarButton) {
-
-            sidebarButton.addEventListener(
+        buttons.forEach(function (button) {
+            button.addEventListener(
                 "click",
-                toggle
+                function () {
+                    const enabled =
+                        document.body.classList.toggle(
+                            "dark-mode"
+                        );
+
+                    document.documentElement.classList.toggle(
+                        "dark-mode",
+                        enabled
+                    );
+
+                    localStorage.setItem(
+                        "skillGapTheme",
+                        enabled
+                            ? "dark"
+                            : "light"
+                    );
+
+                    updateChartsTheme();
+                }
             );
-        }
-
-
-        if (topButton) {
-
-            topButton.addEventListener(
-                "click",
-                toggle
-            );
-        }
+        });
     }
 
 
     /* ========================================================
-       SIDEBAR
+       SIDEBAR / MOBILE MENU
        ======================================================== */
 
     function initSidebar() {
+        const menuButtons =
+            qsa(
+                "#menu-toggle, #mobile-menu-toggle, .menu-toggle"
+            );
 
         const sidebar =
-            $("app-sidebar");
+            $("sidebar");
 
-        const overlay =
-            $("sidebar-overlay");
-
-        const openButton =
-            $("mobile-menu-toggle");
-
-        const closeButton =
-            $("sidebar-close");
-
-
-        function openSidebar() {
-
-            if (!sidebar) {
-                return;
-            }
-
-            sidebar.classList.add(
-                "open"
-            );
-
-            if (overlay) {
-
-                overlay.classList.add(
-                    "active"
-                );
-            }
-        }
-
-
-        function closeSidebar() {
-
-            if (!sidebar) {
-                return;
-            }
-
-            sidebar.classList.remove(
-                "open"
-            );
-
-            if (overlay) {
-
-                overlay.classList.remove(
-                    "active"
-                );
-            }
-        }
-
-
-        if (openButton) {
-
-            openButton.addEventListener(
+        menuButtons.forEach(function (button) {
+            button.addEventListener(
                 "click",
-                openSidebar
-            );
-        }
-
-
-        if (closeButton) {
-
-            closeButton.addEventListener(
-                "click",
-                closeSidebar
-            );
-        }
-
-
-        if (overlay) {
-
-            overlay.addEventListener(
-                "click",
-                closeSidebar
-            );
-        }
-
-
-        qsa(
-            ".nav-item"
-        ).forEach(
-            function (item) {
-
-                item.addEventListener(
-                    "click",
-                    function () {
-
-                        closeSidebar();
+                function () {
+                    if (sidebar) {
+                        sidebar.classList.toggle(
+                            "open"
+                        );
                     }
-                );
-            }
-        );
+
+                    document.body.classList.toggle(
+                        "sidebar-open"
+                    );
+                }
+            );
+        });
+
+        const closeButtons =
+            qsa(
+                "#sidebar-close, .sidebar-close"
+            );
+
+        closeButtons.forEach(function (button) {
+            button.addEventListener(
+                "click",
+                function () {
+                    if (sidebar) {
+                        sidebar.classList.remove(
+                            "open"
+                        );
+                    }
+
+                    document.body.classList.remove(
+                        "sidebar-open"
+                    );
+                }
+            );
+        });
     }
 
 
@@ -1636,549 +1017,264 @@ document.addEventListener("DOMContentLoaded", function () {
        NAVIGATION
        ======================================================== */
 
-    function navigateToView(
-        view
-    ) {
-
+    function initNavigation() {
         const navItems =
             qsa(".nav-item");
 
-        const panels =
+        const views =
             qsa(".view-panel");
 
+        navItems.forEach(function (item) {
+            item.addEventListener(
+                "click",
+                function (event) {
+                    event.preventDefault();
 
-        navItems.forEach(
-            function (nav) {
-
-                nav.classList.toggle(
-                    "active",
-                    nav.dataset.view === view
-                );
-            }
-        );
-
-
-        panels.forEach(
-            function (panel) {
-
-                panel.classList.toggle(
-                    "active",
-                    panel.id ===
-                    "view-" + view
-                );
-            }
-        );
-
-
-        state.currentView =
-            view;
-
-
-        updatePageHeading(
-            view
-        );
-
-
-        if (
-            view === "roadmap"
-        ) {
-
-            loadRoadmap();
-        }
-
-
-        if (
-            view === "interview"
-        ) {
-
-            prepareInterview();
-        }
-    }
-
-
-    function initNavigation() {
-
-        qsa(
-            ".nav-item"
-        ).forEach(
-            function (item) {
-
-                item.addEventListener(
-                    "click",
-                    function () {
-
-                        const view =
-                            item.dataset.view;
-
-                        if (!view) {
-                            return;
-                        }
-
-                        navigateToView(
-                            view
+                    const targetView =
+                        item.getAttribute(
+                            "data-view"
                         );
+
+                    if (!targetView) {
+                        return;
                     }
-                );
-            }
-        );
-    }
 
+                    navItems.forEach(
+                        function (nav) {
+                            nav.classList.remove(
+                                "active"
+                            );
+                        }
+                    );
 
-    function updatePageHeading(
-        view
-    ) {
+                    views.forEach(
+                        function (view) {
+                            view.style.display =
+                                "none";
+                        }
+                    );
 
-        const title =
-            $("page-title");
+                    item.classList.add(
+                        "active"
+                    );
 
-        const subtitle =
-            $("page-subtitle");
+                    const target =
+                        $(targetView);
 
+                    if (target) {
+                        target.style.display =
+                            "block";
+                    }
 
-        const data = {
+                    state.currentView =
+                        targetView;
 
-            dashboard: [
-                "Dashboard",
-                "Analyze your skills against live career opportunities."
-            ],
+                    if (
+                        targetView ===
+                        "view-roadmap"
+                    ) {
+                        loadDynamicRoadmap();
+                    }
 
-            resume: [
-                "ATS & Resume Parser",
-                "Extract skills and evaluate your resume."
-            ],
+                    if (
+                        targetView ===
+                        "view-interview"
+                    ) {
+                        loadDynamicInterview();
+                    }
 
-            skillgap: [
-                "Skill Gap",
-                "Identify the skills required for your career target."
-            ],
+                    if (
+                        targetView ===
+                        "view-jobranking"
+                    ) {
+                        loadRankedJobs();
+                    }
 
-            jobs: [
-                "Career Jobs",
-                "Explore and rank jobs from your selected career source."
-            ],
-
-            roadmap: [
-                "Learning Roadmap",
-                "Build a learning path around your missing skills."
-            ],
-
-            interview: [
-                "Interview",
-                "Practice career-specific interview questions."
-            ],
-
-            report: [
-                "Report",
-                "Generate your current career analysis report."
-            ],
-
-            profile: [
-                "Profile",
-                "Manage your personal and academic information."
-            ]
-        };
-
-
-        if (data[view]) {
-
-            if (title) {
-
-                title.textContent =
-                    data[view][0];
-            }
-
-
-            if (subtitle) {
-
-                subtitle.textContent =
-                    data[view][1];
-            }
-        }
+                    if (
+                        targetView ===
+                        "view-report"
+                    ) {
+                        updateReport();
+                    }
+                }
+            );
+        });
     }
 
 
     /* ========================================================
-       CAREER URL SCRAPING
+       CAREER URL / DYNAMIC JOB SCRAPER
        ======================================================== */
 
-    function initCareerScraper() {
-
+    function initWebScraper() {
         const button =
-            $("scrape-career-url");
+            $("btn-scrape-url");
 
         const input =
-            $("career-url");
-
+            $("input-scrape-url");
 
         if (!button || !input) {
             return;
         }
 
+        if (
+            state.careerUrl &&
+            !input.value
+        ) {
+            input.value =
+                state.careerUrl;
+        }
 
         button.addEventListener(
             "click",
-            function () {
+            async function () {
+                const url =
+                    input.value.trim();
 
-                scrapeCareerUrl(
-                    input.value.trim()
-                );
-            }
-        );
+                const resultBox =
+                    $("scrape-results-box");
 
-
-        input.addEventListener(
-            "keydown",
-            function (event) {
-
-                if (
-                    event.key ===
-                    "Enter"
-                ) {
-
-                    event.preventDefault();
-
-                    scrapeCareerUrl(
-                        input.value.trim()
+                if (!url) {
+                    showPopup(
+                        "Career URL Required",
+                        "Please enter a valid career or jobs URL.",
+                        "warning"
                     );
+
+                    return;
                 }
-            }
-        );
-    }
 
+                try {
+                    new URL(url);
+                } catch (error) {
+                    showPopup(
+                        "Invalid URL",
+                        "Please enter a complete valid URL.",
+                        "warning"
+                    );
 
-    async function scrapeCareerUrl(
-        url
-    ) {
+                    return;
+                }
 
-        if (!url) {
+                if (resultBox) {
+                    resultBox.className =
+                        "alert alert-info";
 
-            showPopup(
-                "Career URL Required",
-                "Please enter a valid career or jobs URL.",
-                "warning"
-            );
+                    resultBox.textContent =
+                        "Analyzing career page and extracting available jobs...";
 
-            return;
-        }
+                    resultBox.style.display =
+                        "block";
+                }
 
+                setLoading(
+                    button,
+                    true,
+                    "Analyzing..."
+                );
 
-        try {
+                try {
+                    const result =
+                        await apiRequest(
+                            "scrape_url",
+                            {
+                                url: url,
+                                career_url: url
+                            }
+                        );
 
-            const parsed =
-                new URL(url);
-
-
-            if (
-                parsed.protocol !==
-                    "http:" &&
-                parsed.protocol !==
-                    "https:"
-            ) {
-
-                throw new Error();
-            }
-
-        } catch (error) {
-
-            showPopup(
-                "Invalid Career URL",
-                "Please enter a valid HTTP or HTTPS career URL.",
-                "error"
-            );
-
-            return;
-        }
-
-
-        const button =
-            $("scrape-career-url");
-
-        const status =
-            $("career-url-status");
-
-
-        setLoading(
-            button,
-            true,
-            "Fetching jobs..."
-        );
-
-
-        if (status) {
-
-            status.textContent =
-                "Connecting to the career source...";
-
-            status.className =
-                "inline-status loading";
-        }
-
-
-        try {
-
-            const result =
-                await apiRequest(
-                    "scrape_url",
-                    {
-                        url:
-                            url,
-
-                        career_url:
-                            url
+                    if (!apiSuccess(result)) {
+                        throw new Error(
+                            result.message ||
+                            result.error ||
+                            "Unable to scrape the URL."
+                        );
                     }
-                );
 
+                    state.careerUrl =
+                        url;
 
-            if (
-                !apiSuccess(result)
-            ) {
+                    const jobs =
+                        result.jobs ||
+                        result.career_jobs ||
+                        result.data?.jobs ||
+                        [];
 
-                throw new Error(
-                    result.message ||
-                    result.error ||
-                    "Unable to fetch jobs."
-                );
-            }
+                    state.careerJobs =
+                        normalizeJobs(
+                            jobs
+                        );
 
+                    state.requiredSkills =
+                        normalizeSkills(
+                            result.required_skills ||
+                            result.data?.required_skills ||
+                            extractRequiredSkillsFromJobs(
+                                state.careerJobs
+                            )
+                        );
 
-            const jobs =
-                result.jobs ||
-                result.career_jobs ||
-                result.data?.jobs ||
-                result.data?.career_jobs ||
-                [];
+                    updateGlobalData();
 
+                    if (resultBox) {
+                        resultBox.className =
+                            "alert alert-success";
 
-            state.careerUrl =
-                url;
+                        resultBox.innerHTML =
+                            `<strong>${state.careerJobs.length}</strong> job(s) extracted successfully.`;
+                    }
 
+                    renderJobs();
+                    renderSkillGap();
+                    updateRecommendation();
+                    updateStats();
+                    renderDashboardCharts();
 
-            state.careerJobs =
-                normalizeJobs(
-                    jobs
-                );
-
-
-            if (
-                Array.isArray(
-                    result.required_skills
-                )
-            ) {
-
-                state.requiredSkills =
-                    normalizeSkills(
-                        result.required_skills
+                    showPopup(
+                        "Career URL Analyzed",
+                        state.careerJobs.length +
+                        " job(s) were extracted from the career page.",
+                        "success"
                     );
-            }
 
+                } catch (error) {
+                    if (resultBox) {
+                        resultBox.className =
+                            "alert alert-error";
 
-            if (
-                result.recommended_job
-            ) {
+                        resultBox.textContent =
+                            error.message ||
+                            "Unable to analyze the career URL.";
+                    }
 
-                state.recommendedJob =
-                    result.recommended_job;
-            }
-
-
-            updateCareerInputs(
-                url
-            );
-
-            renderJobs();
-
-            updateRecommendation();
-
-            updateStats();
-
-            renderSkillGap();
-
-            renderDashboardCharts();
-
-
-            if (status) {
-
-                status.textContent =
-                    state.careerJobs.length +
-                    " job(s) found from the career source.";
-
-                status.className =
-                    "inline-status success";
-            }
-
-
-            showPopup(
-                "Jobs Extracted",
-                state.careerJobs.length +
-                " job(s) extracted successfully.",
-                "success"
-            );
-
-
-        } catch (error) {
-
-            console.error(
-                "Career scraping error:",
-                error
-            );
-
-
-            if (status) {
-
-                status.textContent =
-                    error.message ||
-                    "Unable to fetch jobs.";
-
-                status.className =
-                    "inline-status error";
-            }
-
-
-            showPopup(
-                "Unable to Fetch Jobs",
-                error.message ||
-                "The career source could not be processed.",
-                "error"
-            );
-
-
-        } finally {
-
-            setLoading(
-                button,
-                false
-            );
-        }
-    }
-
-
-    function updateCareerInputs(
-        url
-    ) {
-
-        const careerUrl =
-            $("career-url");
-
-        const jobsCareerUrl =
-            $("jobs-career-url");
-
-        const reportCareerUrl =
-            $("report-career-url");
-
-
-        if (careerUrl) {
-
-            careerUrl.value =
-                url || "";
-        }
-
-
-        if (jobsCareerUrl) {
-
-            jobsCareerUrl.value =
-                url || "";
-        }
-
-
-        if (reportCareerUrl) {
-
-            reportCareerUrl.value =
-                url || "";
-        }
-    }
-
-
-    /* ========================================================
-       JOB NORMALIZATION
-       ======================================================== */
-
-    function normalizeJobs(
-        jobs
-    ) {
-
-        if (!Array.isArray(jobs)) {
-            return [];
-        }
-
-
-        return jobs
-            .map(
-                normalizeJob
-            )
-            .filter(
-                function (job) {
-
-                    return (
-                        job.title ||
-                        job.company ||
-                        job.description
+                    showPopup(
+                        "Career URL Analysis Failed",
+                        error.message ||
+                        "Unable to analyze the career URL.",
+                        "error"
+                    );
+                } finally {
+                    setLoading(
+                        button,
+                        false
                     );
                 }
-            );
+            }
+        );
     }
 
 
-    function normalizeJob(
-        job
-    ) {
-
-        job =
-            job &&
-            typeof job ===
-                "object"
-                ? job
-                : {};
-
-
-        const skills =
-            job.required_skills ||
-            job.skills ||
-            job.requirements ||
-            job.technical_skills ||
-            [];
-
-
-        let normalizedSkills =
-            [];
-
-
-        if (
-            Array.isArray(skills)
-        ) {
-
-            normalizedSkills =
-                normalizeSkills(
-                    skills
-                );
-
-        } else if (
-            typeof skills ===
-            "string"
-        ) {
-
-            normalizedSkills =
-                normalizeSkills(
-                    skills.split(
-                        /[,;|]/g
-                    )
-                );
-        }
-
+    function normalizeJob(job) {
+        job = job || {};
 
         return {
-
-            id:
-                job.id ||
-                job.job_id ||
-                "",
-
             title:
                 job.title ||
                 job.role ||
                 job.job_title ||
                 job.position ||
                 job.name ||
-                "",
+                "Untitled Job",
 
             company:
                 job.company ||
@@ -2196,7 +1292,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 job.link ||
                 job.job_url ||
                 job.apply_url ||
-                "#",
+                "",
 
             description:
                 job.description ||
@@ -2205,522 +1301,345 @@ document.addEventListener("DOMContentLoaded", function () {
                 "",
 
             skills:
-                normalizedSkills,
-
-            match:
-                Number(
-                    job.match ||
-                    job.match_score ||
-                    0
+                normalizeSkills(
+                    job.skills ||
+                    job.required_skills ||
+                    job.requirements ||
+                    job.technical_skills ||
+                    []
                 )
         };
     }
 
+    function normalizeJobs(jobs) {
+        if (!Array.isArray(jobs)) {
+            return [];
+        }
 
-    /* ========================================================
-       JOB MATCHING
-       ======================================================== */
-
-    function calculateJobMatch(
-        job
-    ) {
-
-        const userSkills =
-            normalizeSkills(
-                state.extractedSkills
-            );
-
-
-        const jobSkills =
-            normalizeSkills(
-                job.skills
-            );
-
-
-        if (!jobSkills.length) {
-
-            const text =
-                normalizeSkill(
-                    job.description
+        return jobs
+            .map(normalizeJob)
+            .filter(function (job) {
+                return (
+                    job.title ||
+                    job.description ||
+                    job.url
                 );
+            });
+    }
 
+    function extractRequiredSkillsFromJobs(jobs) {
+        const allSkills = [];
 
-            if (
-                !text ||
-                !userSkills.length
-            ) {
-
-                return 0;
-            }
-
-
-            let count = 0;
-
-
-            userSkills.forEach(
+        jobs.forEach(function (job) {
+            job.skills.forEach(
                 function (skill) {
-
                     if (
-                        text.includes(
-                            normalizeSkill(
-                                skill
-                            )
+                        !allSkills.some(
+                            function (existing) {
+                                return (
+                                    existing.toLowerCase() ===
+                                    skill.toLowerCase()
+                                );
+                            }
                         )
                     ) {
-
-                        count++;
+                        allSkills.push(
+                            skill
+                        );
                     }
                 }
             );
+        });
 
-
-            return Math.round(
-                (
-                    count /
-                    userSkills.length
-                ) * 100
-            );
-        }
-
-
-        if (!userSkills.length) {
-            return 0;
-        }
-
-
-        let matched = 0;
-
-
-        jobSkills.forEach(
-            function (required) {
-
-                const requiredNorm =
-                    normalizeSkill(
-                        required
-                    );
-
-
-                const found =
-                    userSkills.some(
-                        function (userSkill) {
-
-                            const userNorm =
-                                normalizeSkill(
-                                    userSkill
-                                );
-
-
-                            return (
-                                userNorm ===
-                                    requiredNorm ||
-
-                                userNorm.includes(
-                                    requiredNorm
-                                ) ||
-
-                                requiredNorm.includes(
-                                    userNorm
-                                )
-                            );
-                        }
-                    );
-
-
-                if (found) {
-                    matched++;
-                }
-            }
-        );
-
-
-        return Math.round(
-            (
-                matched /
-                jobSkills.length
-            ) * 100
-        );
+        return allSkills;
     }
 
 
     /* ========================================================
-       RENDER JOBS
+       JOB RENDERING
        ======================================================== */
 
     function renderJobs() {
+        const containers =
+            [
+                $("jobs-container"),
+                $("career-jobs-container"),
+                $("dynamic-jobs-container")
+            ].filter(Boolean);
 
-        const container =
-            $("job-results");
-
-
-        if (!container) {
+        if (!containers.length) {
             return;
         }
 
+        const jobs =
+            state.careerJobs;
 
-        if (
-            !state.careerJobs.length
-        ) {
+        const html =
+            jobs.length
+                ? jobs.map(
+                    function (job, index) {
+                        return `
+                            <div class="job-card">
+                                <div class="job-card-header">
+                                    <h4>
+                                        ${escapeHtml(
+                                            job.title
+                                        )}
+                                    </h4>
 
-            container.innerHTML = `
-                <div class="empty-state-card">
-                    <h3>No jobs loaded</h3>
-                    <p>
-                        Enter a career URL above and fetch live jobs
-                        to populate this table.
-                    </p>
-                </div>
-            `;
-
-            updateStats();
-
-            return;
-        }
-
-
-        const ranked =
-            state.careerJobs
-                .map(
-                    function (job) {
-
-                        return {
-                            ...job,
-
-                            match:
-                                calculateJobMatch(
-                                    job
-                                )
-                        };
-                    }
-                )
-                .sort(
-                    function (a, b) {
-
-                        return (
-                            b.match -
-                            a.match
-                        );
-                    }
-                );
-
-
-        state.careerJobs =
-            ranked;
-
-
-        const rows =
-            ranked.map(
-                function (job) {
-
-                    const title =
-                        job.title ||
-                        "Job Opportunity";
-
-                    const company =
-                        job.company ||
-                        "—";
-
-                    const location =
-                        Array.isArray(
-                            job.location
-                        )
-                            ? job.location.join(
-                                ", "
-                            )
-                            : job.location ||
-                              "—";
-
-
-                    const url =
-                        job.url &&
-                        job.url !== "#"
-                            ? job.url
-                            : "";
-
-
-                    return `
-                        <tr>
-
-                            <td>
-                                ${escapeHtml(title)}
-                            </td>
-
-                            <td>
-                                ${escapeHtml(company)}
-                            </td>
-
-                            <td>
-                                ${escapeHtml(location)}
-                            </td>
-
-                            <td>
-                                <span class="match-badge">
-                                    ${job.match}%
-                                </span>
-                            </td>
-
-                            <td>
+                                    ${
+                                        job.company
+                                            ? `<span>${escapeHtml(job.company)}</span>`
+                                            : ""
+                                    }
+                                </div>
 
                                 ${
-                                    url
+                                    job.location
+                                        ? `
+                                            <div class="job-location">
+                                                ${escapeHtml(job.location)}
+                                            </div>
+                                        `
+                                        : ""
+                                }
+
+                                ${
+                                    job.skills.length
+                                        ? `
+                                            <div class="job-skills">
+                                                ${job.skills
+                                                    .slice(0, 12)
+                                                    .map(
+                                                        function (
+                                                            skill
+                                                        ) {
+                                                            return `
+                                                                <span class="skill-tag">
+                                                                    ${escapeHtml(skill)}
+                                                                </span>
+                                                            `;
+                                                        }
+                                                    )
+                                                    .join("")}
+                                            </div>
+                                        `
+                                        : ""
+                                }
+
+                                ${
+                                    job.url
                                         ? `
                                             <a
-                                                href="${escapeHtml(url)}"
+                                                href="${escapeHtml(job.url)}"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                class="job-link"
+                                                class="btn"
                                             >
                                                 View Job
                                             </a>
                                         `
-                                        : "—"
+                                        : ""
                                 }
-
-                            </td>
-
-                        </tr>
-                    `;
-                }
-            ).join("");
-
-
-        container.innerHTML = `
-            <div class="job-table-wrapper">
-
-                <table class="job-table">
-
-                    <thead>
-
-                        <tr>
-                            <th>Job Role</th>
-                            <th>Company</th>
-                            <th>Location</th>
-                            <th>Match</th>
-                            <th>Action</th>
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-                        ${rows}
-                    </tbody>
-
-                </table>
-
-            </div>
-        `;
-
-
-        updateRecommendation();
-
-        updateStats();
-    }
-
-
-    /* ========================================================
-       RECOMMENDATION
-       ======================================================== */
-
-    function updateRecommendation() {
-
-        const title =
-            $("recommended-job");
-
-        const description =
-            $("recommendation-description");
-
-
-        if (
-            !state.careerJobs.length
-        ) {
-
-            if (title) {
-
-                title.textContent =
-                    "No job recommendation yet";
-            }
-
-
-            if (description) {
-
-                description.textContent =
-                    "Fetch jobs from a career URL and upload your resume to generate a dynamic recommendation.";
-            }
-
-
-            const metric =
-                $("metric-match");
-
-            if (metric) {
-                metric.textContent =
-                    "0%";
-            }
-
-            return;
-        }
-
-
-        const sorted =
-            [...state.careerJobs]
-                .sort(
-                    function (a, b) {
-
-                        return (
-                            Number(b.match || 0) -
-                            Number(a.match || 0)
-                        );
+                            </div>
+                        `;
                     }
-                );
+                ).join("")
+                : `
+                    <div class="empty-state">
+                        <h4>No jobs extracted yet</h4>
+                        <p>
+                            Enter a career or jobs URL and analyze it
+                            to load real job openings.
+                        </p>
+                    </div>
+                `;
 
-
-        const best =
-            sorted[0];
-
-
-        if (!best) {
-            return;
-        }
-
-
-        state.recommendedJob =
-            best;
-
-
-        if (title) {
-
-            title.textContent =
-                best.title ||
-                "Recommended Career Opportunity";
-        }
-
-
-        if (description) {
-
-            const company =
-                best.company
-                    ? " at " +
-                      best.company
-                    : "";
-
-
-            description.textContent =
-                "Best current skill match: " +
-                Number(
-                    best.match || 0
-                ) +
-                "%" +
-                company +
-                ".";
-        }
-
-
-        const metric =
-            $("metric-match");
-
-
-        if (metric) {
-
-            metric.textContent =
-                Number(
-                    best.match || 0
-                ) + "%";
-        }
+        containers.forEach(
+            function (container) {
+                container.innerHTML =
+                    html;
+            }
+        );
     }
 
 
     /* ========================================================
-       DASHBOARD STATISTICS
+       DYNAMIC JOB MATCHING
        ======================================================== */
 
-    function updateStats() {
+    function calculateJobMatch(job) {
+        const resumeSkills =
+            normalizeSkills(
+                state.extractedSkills
+            );
 
-        let bestMatch = 0;
+        const required =
+            normalizeSkills(
+                job.skills
+            );
 
+        if (!required.length) {
+            return {
+                matched: [],
+                missing: [],
+                percentage: 0
+            };
+        }
+
+        const matched =
+            required.filter(
+                function (requiredSkill) {
+                    return resumeSkills.some(
+                        function (resumeSkill) {
+                            return (
+                                resumeSkill
+                                    .toLowerCase()
+                                    .includes(
+                                        requiredSkill
+                                            .toLowerCase()
+                                    ) ||
+                                requiredSkill
+                                    .toLowerCase()
+                                    .includes(
+                                        resumeSkill
+                                            .toLowerCase()
+                                    )
+                            );
+                        }
+                    );
+                }
+            );
+
+        const missing =
+            required.filter(
+                function (requiredSkill) {
+                    return !matched.includes(
+                        requiredSkill
+                    );
+                }
+            );
+
+        const percentage =
+            Math.round(
+                (
+                    matched.length /
+                    required.length
+                ) * 100
+            );
+
+        return {
+            matched: matched,
+            missing: missing,
+            percentage: percentage
+        };
+    }
+
+    function getBestJob() {
+        if (!state.careerJobs.length) {
+            return null;
+        }
+
+        let best = null;
 
         state.careerJobs.forEach(
             function (job) {
-
                 const match =
-                    Number(
-                        job.match ||
-                        calculateJobMatch(
-                            job
-                        ) ||
-                        0
+                    calculateJobMatch(
+                        job
                     );
 
-
                 if (
-                    match >
-                    bestMatch
+                    !best ||
+                    match.percentage >
+                    best.match.percentage
                 ) {
-
-                    bestMatch =
-                        match;
+                    best = {
+                        job: job,
+                        match: match
+                    };
                 }
             }
         );
 
+        return best;
+    }
 
-        const ats =
-            Math.round(
-                state.atsScore || 0
-            );
+    function updateRecommendation() {
+        const best =
+            getBestJob();
 
+        state.recommendedJob =
+            best;
 
-        const jobCount =
-            state.careerJobs.length;
+        const titleElements =
+            [
+                $("recommended-job-title"),
+                $("recommendation-role"),
+                $("best-job-role")
+            ].filter(Boolean);
 
+        const companyElements =
+            [
+                $("recommended-job-company"),
+                $("recommendation-company"),
+                $("best-job-company")
+            ].filter(Boolean);
 
-        const skillCount =
-            state.extractedSkills.length;
+        const scoreElements =
+            [
+                $("recommended-job-score"),
+                $("recommendation-score"),
+                $("best-job-score")
+            ].filter(Boolean);
 
-
-        const values = {
-
-            "stat-skills":
-                skillCount,
-
-            "stat-ats":
-                ats + "%",
-
-            "stat-jobs":
-                jobCount,
-
-            "stat-match":
-                bestMatch + "%",
-
-
-            "metric-skills":
-                skillCount,
-
-            "metric-ats":
-                ats + "%",
-
-            "metric-jobs":
-                jobCount,
-
-            "metric-match":
-                bestMatch + "%"
-        };
-
-
-        Object.keys(values)
-            .forEach(
-                function (id) {
-
-                    const element =
-                        $(id);
-
-
-                    if (!element) {
-                        return;
-                    }
-
-
+        if (!best) {
+            titleElements.forEach(
+                function (element) {
                     element.textContent =
-                        values[id];
+                        "No recommendation yet";
                 }
             );
+
+            companyElements.forEach(
+                function (element) {
+                    element.textContent =
+                        "";
+                }
+            );
+
+            scoreElements.forEach(
+                function (element) {
+                    element.textContent =
+                        "0%";
+                }
+            );
+
+            return;
+        }
+
+        titleElements.forEach(
+            function (element) {
+                element.textContent =
+                    best.job.title;
+            }
+        );
+
+        companyElements.forEach(
+            function (element) {
+                element.textContent =
+                    best.job.company ||
+                    "";
+            }
+        );
+
+        scoreElements.forEach(
+            function (element) {
+                element.textContent =
+                    best.match.percentage +
+                    "%";
+            }
+        );
     }
 
 
@@ -2729,9 +1648,18 @@ document.addEventListener("DOMContentLoaded", function () {
        ======================================================== */
 
     function initResumeUpload() {
+        /*
+         * SUPPORT BOTH:
+         *   Current index.php -> resume-file
+         *   Older HTML        -> input-resume-file
+         */
 
         const input =
-            $("resume-file");
+            $("resume-file") ||
+            $("input-resume-file");
+
+        const uploadForm =
+            $("form-resume-upload");
 
         const dropZone =
             $("resume-drop-zone");
@@ -2739,106 +1667,68 @@ document.addEventListener("DOMContentLoaded", function () {
         const selectButton =
             $("resume-select-button");
 
-        const form =
-            $("form-resume-upload");
+        const evaluateButton =
+            $("evaluate-resume");
 
+        const sampleButton =
+            $("btn-load-sample-resume");
 
         if (!input) {
+            console.warn(
+                "Resume file input not found."
+            );
+
             return;
         }
-
-
-        input.setAttribute(
-            "accept",
-            ".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-        );
-
 
         /* ----------------------------------------------------
            SELECT BUTTON
            ---------------------------------------------------- */
 
         if (selectButton) {
-
             selectButton.addEventListener(
                 "click",
                 function (event) {
-
                     event.preventDefault();
-
                     input.click();
                 }
             );
         }
 
-
         /* ----------------------------------------------------
-           NORMAL FILE SELECTION
+           FILE SELECTION
            ---------------------------------------------------- */
 
         input.addEventListener(
             "change",
             function () {
-
-                const file =
+                if (
                     input.files &&
                     input.files.length
-                        ? input.files[0]
-                        : null;
-
-
-                if (!file) {
-
+                ) {
                     state.selectedResume =
-                        null;
+                        input.files[0];
 
-                    updateResumeFileName("");
-
-                    return;
-                }
-
-
-                const valid =
-                    setSelectedResume(
-                        file
+                    updateResumeFileName(
+                        input.files[0].name
                     );
-
-
-                if (!valid) {
-
-                    try {
-
-                        input.value =
-                            "";
-
-                    } catch (error) {
-
-                        console.warn(
-                            "Unable to clear file input:",
-                            error
-                        );
-                    }
                 }
             }
         );
 
-
         /* ----------------------------------------------------
-           DRAG AND DROP
+           DRAG & DROP
            ---------------------------------------------------- */
 
         if (dropZone) {
-
             [
                 "dragenter",
                 "dragover"
             ].forEach(
                 function (eventName) {
-
                     dropZone.addEventListener(
                         eventName,
                         function (event) {
-
                             event.preventDefault();
                             event.stopPropagation();
 
@@ -2850,17 +1740,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             );
 
-
             [
                 "dragleave",
                 "drop"
             ].forEach(
                 function (eventName) {
-
                     dropZone.addEventListener(
                         eventName,
                         function (event) {
-
                             event.preventDefault();
                             event.stopPropagation();
 
@@ -2872,257 +1759,151 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             );
 
-
             dropZone.addEventListener(
                 "drop",
                 function (event) {
-
                     const files =
-                        event.dataTransfer &&
                         event.dataTransfer.files;
 
-
                     if (
-                        !files ||
-                        !files.length
+                        files &&
+                        files.length
                     ) {
-                        return;
-                    }
+                        state.selectedResume =
+                            files[0];
 
+                        /*
+                         * Do not depend on assigning
+                         * input.files because some browsers
+                         * restrict it.
+                         */
+                        try {
+                            const transfer =
+                                new DataTransfer();
 
-                    const file =
-                        files[0];
+                            transfer.items.add(
+                                files[0]
+                            );
 
+                            input.files =
+                                transfer.files;
+                        } catch (error) {
+                            console.warn(
+                                "Could not assign dropped file to input.",
+                                error
+                            );
+                        }
 
-                    const valid =
-                        setSelectedResume(
-                            file
-                        );
-
-
-                    if (!valid) {
-                        return;
-                    }
-
-
-                    try {
-
-                        const dataTransfer =
-                            new DataTransfer();
-
-                        dataTransfer.items.add(
-                            file
-                        );
-
-                        input.files =
-                            dataTransfer.files;
-
-                    } catch (error) {
-
-                        console.warn(
-                            "Could not synchronize dropped file with input:",
-                            error
+                        updateResumeFileName(
+                            files[0].name
                         );
                     }
                 }
             );
         }
 
-
         /* ----------------------------------------------------
-           FORM SUBMISSION
+           FORM SUBMIT
            ---------------------------------------------------- */
 
-        if (form) {
-
-            form.addEventListener(
+        if (uploadForm) {
+            uploadForm.addEventListener(
                 "submit",
                 function (event) {
-
                     event.preventDefault();
 
                     uploadResume();
                 }
             );
         }
-    }
 
+        /*
+         * Some versions of index.php use a button instead
+         * of a form submit. Support both.
+         */
+        if (
+            evaluateButton &&
+            !uploadForm
+        ) {
+            evaluateButton.addEventListener(
+                "click",
+                function (event) {
+                    event.preventDefault();
 
-    /* ========================================================
-       RESUME VALIDATION
-       ======================================================== */
-
-    function setSelectedResume(
-        file
-    ) {
-
-        if (!file) {
-
-            state.selectedResume =
-                null;
-
-            updateResumeFileName("");
-
-            return false;
-        }
-
-
-        const fileName =
-            String(
-                file.name || ""
-            ).trim();
-
-
-        const lowerName =
-            fileName.toLowerCase();
-
-
-        const allowedExtensions = [
-            ".pdf",
-            ".doc",
-            ".docx",
-            ".txt"
-        ];
-
-
-        const validExtension =
-            allowedExtensions.some(
-                function (extension) {
-
-                    return lowerName.endsWith(
-                        extension
-                    );
+                    uploadResume();
                 }
             );
-
-
-        if (!validExtension) {
-
-            state.selectedResume =
-                null;
-
-            updateResumeFileName("");
-
-
-            showPopup(
-                "Invalid Resume File",
-                "Please select a PDF, DOC, DOCX or TXT resume file.",
-                "warning"
-            );
-
-
-            return false;
         }
 
+        /* ----------------------------------------------------
+           SAMPLE RESUME
+           ---------------------------------------------------- */
 
-        if (
-            !Number(file.size) ||
-            Number(file.size) <= 0
-        ) {
+        if (sampleButton) {
+            sampleButton.addEventListener(
+                "click",
+                async function () {
+                    const status =
+                        $("resume-upload-status");
 
-            state.selectedResume =
-                null;
+                    if (status) {
+                        status.style.display =
+                            "block";
 
-            updateResumeFileName("");
+                        status.className =
+                            "alert alert-info";
 
+                        status.textContent =
+                            "Loading sample profile...";
+                    }
 
-            showPopup(
-                "Invalid Resume File",
-                "The selected resume file is empty. Please choose another file.",
-                "warning"
-            );
+                    try {
+                        const result =
+                            await apiRequest(
+                                "load_sample",
+                                {},
+                                {
+                                    method: "GET"
+                                }
+                            );
 
+                        if (
+                            !apiSuccess(
+                                result
+                            )
+                        ) {
+                            throw new Error(
+                                result.message ||
+                                "Unable to load sample profile."
+                            );
+                        }
 
-            return false;
-        }
+                        window.location.reload();
 
-
-        const maxSize =
-            10 * 1024 * 1024;
-
-
-        if (
-            Number(file.size) >
-            maxSize
-        ) {
-
-            state.selectedResume =
-                null;
-
-            updateResumeFileName("");
-
-
-            showPopup(
-                "Resume File Too Large",
-                "Please select a resume smaller than 10 MB.",
-                "warning"
-            );
-
-
-            return false;
-        }
-
-
-        state.selectedResume =
-            file;
-
-
-        updateResumeFileName(
-            fileName
-        );
-
-
-        const dropZone =
-            $("resume-drop-zone");
-
-
-        if (dropZone) {
-
-            dropZone.classList.add(
-                "file-selected"
+                    } catch (error) {
+                        showPopup(
+                            "Sample Profile Failed",
+                            error.message ||
+                            "Unable to load sample profile.",
+                            "error"
+                        );
+                    }
+                }
             );
         }
-
-
-        console.log(
-            "Resume selected:",
-            {
-                name: file.name,
-                type: file.type,
-                size: file.size
-            }
-        );
-
-
-        return true;
     }
 
 
-    function updateResumeFileName(
-        name
-    ) {
+    function updateResumeFileName(name) {
+        const elements =
+            [
+                $("resume-file-name"),
+                $("selected-resume-name")
+            ].filter(Boolean);
 
-        const element =
-            $("resume-file-name");
-
-
-        if (element) {
-
-            element.textContent =
-                name || "";
-        }
-
-
-        const displays =
-            qsa(
-                "[data-resume-file-name]"
-            );
-
-
-        displays.forEach(
-            function (display) {
-
-                display.textContent =
+        elements.forEach(
+            function (element) {
+                element.textContent =
                     name || "";
             }
         );
@@ -3130,117 +1911,128 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
     /* ========================================================
-       RESUME ANALYSIS
+       ACTUAL RESUME UPLOAD
        ======================================================== */
 
     async function uploadResume() {
+        /*
+         * IMPORTANT:
+         * Current HTML:
+         *     id="resume-file"
+         *
+         * Old HTML:
+         *     id="input-resume-file"
+         */
 
         const input =
-            $("resume-file");
+            $("resume-file") ||
+            $("input-resume-file");
 
-
-        /*
-         * Prefer the File object stored in state.
-         * This also supports drag-and-drop.
-         */
-
-        let file =
-            state.selectedResume;
-
-
-        /*
-         * If state does not contain a file,
-         * read it directly from the input.
-         */
+        const button =
+            $("evaluate-resume");
 
         if (
-            !file &&
-            input &&
-            input.files &&
-            input.files.length
+            !input ||
+            !input.files ||
+            !input.files.length
         ) {
-
-            file =
-                input.files[0];
-        }
-
-
-        /*
-         * Final validation.
-         */
-
-        if (!file) {
-
             showPopup(
                 "Resume Required",
-                "Please select a valid resume file first.",
+                "Please select a PDF or DOCX resume first.",
                 "warning"
             );
 
             return;
         }
 
+        const file =
+            input.files[0];
 
-        /*
-         * Validate the actual File object again.
-         */
-
-        if (
-            !setSelectedResume(
-                file
-            )
-        ) {
-
-            return;
-        }
-
-
-        /*
-         * Make sure the file can actually be read.
-         */
-
-        if (
-            !file.name ||
-            !file.size ||
-            Number(file.size) <= 0
-        ) {
-
+        if (!file) {
             showPopup(
-                "Invalid Resume File",
-                "The selected resume file could not be read. Please select it again.",
-                "error"
+                "Resume Required",
+                "Please select a valid resume file.",
+                "warning"
             );
 
             return;
         }
 
+        /* ----------------------------------------------------
+           FILE VALIDATION
+           ---------------------------------------------------- */
 
-        const button =
-            $("evaluate-resume");
+        const fileName =
+            String(
+                file.name || ""
+            ).toLowerCase();
 
+        const extension =
+            fileName.includes(".")
+                ? fileName
+                    .substring(
+                        fileName.lastIndexOf(".") + 1
+                    )
+                : "";
+
+        const allowedExtensions =
+            [
+                "pdf",
+                "doc",
+                "docx"
+            ];
+
+        if (
+            !allowedExtensions.includes(
+                extension
+            )
+        ) {
+            showPopup(
+                "Invalid Resume File",
+                "Please upload a PDF, DOC, or DOCX resume.",
+                "warning"
+            );
+
+            return;
+        }
 
         /*
-         * Create multipart/form-data.
+         * 15 MB frontend limit.
+         * Backend should also validate this.
          */
+        if (
+            file.size >
+            15 * 1024 * 1024
+        ) {
+            showPopup(
+                "File Too Large",
+                "Please upload a resume smaller than 15 MB.",
+                "warning"
+            );
+
+            return;
+        }
+
+        /* ----------------------------------------------------
+           FORM DATA
+           ---------------------------------------------------- */
 
         const formData =
             new FormData();
 
-
         /*
-         * Send the file using the primary backend field.
-         */
-
-        formData.append(
-            "resume",
-            file,
-            file.name
-        );
-
-
-        /*
-         * Also send it using resume_file for compatibility
-         * with backend versions that expect that field.
+         * THIS IS THE IMPORTANT FIX.
+         *
+         * Send the same file using both names.
+         *
+         * PHP backend versions may check:
+         *     $_FILES['resume_file']
+         *
+         * or:
+         *     $_FILES['resume']
+         *
+         * Sending both prevents the frontend/backend
+         * naming mismatch.
          */
 
         formData.append(
@@ -3249,40 +2041,67 @@ document.addEventListener("DOMContentLoaded", function () {
             file.name
         );
 
-
-        /*
-         * Send filename explicitly.
-         */
-
         formData.append(
-            "resume_name",
+            "resume",
+            file,
             file.name
         );
 
+        formData.append(
+            "file",
+            file,
+            file.name
+        );
 
         /*
-         * Send career URL when available.
+         * Action is also sent in POST body.
          */
+        formData.append(
+            "action",
+            "upload_resume"
+        );
 
         if (state.careerUrl) {
-
             formData.append(
                 "career_url",
                 state.careerUrl
             );
         }
 
-
-        console.log(
-            "Uploading resume:",
-            {
-                name: file.name,
-                type: file.type,
-                size: file.size,
-                careerUrl: state.careerUrl
-            }
+        formData.append(
+            "target_company",
+            state.targetCompany || ""
         );
 
+        formData.append(
+            "target_role",
+            state.targetRole || ""
+        );
+
+        formData.append(
+            "required_skills",
+            JSON.stringify(
+                state.requiredSkills || []
+            )
+        );
+
+        /* ----------------------------------------------------
+           STATUS
+           ---------------------------------------------------- */
+
+        const statusBox =
+            $("resume-upload-status");
+
+        if (statusBox) {
+            statusBox.className =
+                "alert alert-info";
+
+            statusBox.textContent =
+                "Uploading resume and extracting skills...";
+
+            statusBox.style.display =
+                "block";
+        }
 
         setLoading(
             button,
@@ -3290,38 +2109,29 @@ document.addEventListener("DOMContentLoaded", function () {
             "Analyzing Resume..."
         );
 
-
         try {
-
             const result =
                 await apiRequest(
                     "upload_resume",
                     formData
                 );
 
-
             console.log(
-                "Resume analysis response:",
+                "Resume API response:",
                 result
             );
 
-
-            if (
-                !apiSuccess(result)
-            ) {
-
+            if (!apiSuccess(result)) {
                 throw new Error(
                     result.message ||
                     result.error ||
-                    result.details ||
                     "Resume analysis failed."
                 );
             }
 
-
-            /*
-             * Extracted skills.
-             */
+            /* ------------------------------------------------
+               SAVE RESULTS
+               ------------------------------------------------ */
 
             state.extractedSkills =
                 normalizeSkills(
@@ -3332,23 +2142,12 @@ document.addEventListener("DOMContentLoaded", function () {
                     []
                 );
 
-
-            /*
-             * Required skills.
-             */
-
             state.requiredSkills =
                 normalizeSkills(
                     result.required_skills ||
                     result.data?.required_skills ||
-                    state.requiredSkills ||
-                    []
+                    state.requiredSkills
                 );
-
-
-            /*
-             * ATS score.
-             */
 
             state.atsScore =
                 Number(
@@ -3357,77 +2156,82 @@ document.addEventListener("DOMContentLoaded", function () {
                     0
                 );
 
-
-            /*
-             * Parsed resume/contact information.
-             */
-
-            const resumeData =
-                result.resume ||
-                result.parsed_resume ||
-                result.data?.resume ||
-                result.data?.parsed_resume ||
-                null;
-
-
-            if (resumeData) {
-
+            if (
+                result.resume
+            ) {
                 updateResumeContact(
-                    resumeData
+                    result.resume
                 );
             }
 
+            if (
+                result.data?.resume
+            ) {
+                updateResumeContact(
+                    result.data.resume
+                );
+            }
 
-            /*
-             * Refresh complete application.
-             */
+            window.EXTRACTED_SKILLS =
+                state.extractedSkills;
+
+            window.REQUIRED_SKILLS =
+                state.requiredSkills;
+
+            window.ATS_SCORE =
+                state.atsScore;
+
+            updateGlobalData();
+
+            /* ------------------------------------------------
+               RENDER EVERYTHING
+               ------------------------------------------------ */
 
             renderATS();
-
             renderExtractedSkills();
-
             renderSkillGap();
-
             renderJobs();
-
             updateRecommendation();
-
             updateStats();
-
             renderDashboardCharts();
 
+            if (statusBox) {
+                statusBox.className =
+                    "alert alert-success";
+
+                statusBox.textContent =
+                    "Resume analyzed successfully.";
+            }
 
             showPopup(
-                "Resume Analyzed",
-                "Your resume has been processed successfully.",
+                "Resume Analyzed Successfully",
+                "Your resume has been processed and your skills have been compared with the available jobs.",
                 "success"
             );
 
-
         } catch (error) {
-
             console.error(
                 "Resume analysis error:",
                 error
             );
 
+            if (statusBox) {
+                statusBox.className =
+                    "alert alert-error";
 
-            const message =
-                error &&
-                error.message
-                    ? error.message
-                    : "Unable to analyze the resume.";
-
+                statusBox.textContent =
+                    error.message ||
+                    "Unable to analyze the resume.";
+            }
 
             showPopup(
                 "Resume Analysis Failed",
-                message,
+                error.message ||
+                "Unable to analyze the resume.",
                 "error"
             );
 
-
         } finally {
-
             setLoading(
                 button,
                 false
@@ -3436,57 +2240,54 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    function updateResumeContact(
-        data
-    ) {
+    /* ========================================================
+       RESUME CONTACT INFORMATION
+       ======================================================== */
 
-        if (
-            !data ||
-            typeof data !== "object"
-        ) {
-
+    function updateResumeContact(resume) {
+        if (!resume) {
             return;
         }
 
-
-        const fields = {
-
+        const mappings = {
             "resume-name":
-                data.name ||
-                data.full_name,
+                resume.name,
 
             "resume-email":
-                data.email,
+                resume.email,
 
             "resume-phone":
-                data.phone,
+                resume.phone,
 
             "resume-linkedin":
-                data.linkedin,
+                resume.linkedin,
 
             "resume-github":
-                data.github
+                resume.github
         };
 
+        Object.keys(mappings).forEach(
+            function (id) {
+                const element =
+                    $(id);
 
-        Object.keys(fields)
-            .forEach(
-                function (id) {
-
-                    const element =
-                        $(id);
-
-
+                if (
+                    element &&
+                    mappings[id] !== undefined &&
+                    mappings[id] !== null
+                ) {
                     if (
-                        element &&
-                        fields[id] != null
+                        "value" in element
                     ) {
-
+                        element.value =
+                            mappings[id];
+                    } else {
                         element.textContent =
-                            fields[id];
+                            mappings[id];
                     }
                 }
-            );
+            }
+        );
     }
 
 
@@ -3495,7 +2296,6 @@ document.addEventListener("DOMContentLoaded", function () {
        ======================================================== */
 
     function renderATS() {
-
         const score =
             Math.max(
                 0,
@@ -3507,53 +2307,43 @@ document.addEventListener("DOMContentLoaded", function () {
                 )
             );
 
+        const scoreElements =
+            [
+                $("ats-score"),
+                $("ats-score-value"),
+                $("metric-ats-score")
+            ].filter(Boolean);
 
-        const scoreElement =
-            $("ats-score");
-
-        const metric =
-            $("metric-ats");
+        scoreElements.forEach(
+            function (element) {
+                element.textContent =
+                    Math.round(score);
+            }
+        );
 
         const feedback =
             $("ats-feedback");
 
-
-        if (scoreElement) {
-
-            scoreElement.textContent =
-                Math.round(score) + "%";
-        }
-
-
-        if (metric) {
-
-            metric.textContent =
-                Math.round(score) + "%";
-        }
-
-
         if (feedback) {
+            let text =
+                "";
 
             if (score >= 80) {
-
-                feedback.textContent =
-                    "Your resume currently has strong compatibility with the analyzed requirements.";
-
+                text =
+                    "Your resume has strong ATS compatibility.";
             } else if (score >= 60) {
-
-                feedback.textContent =
-                    "Your resume has moderate compatibility. Review the missing skills identified below.";
-
+                text =
+                    "Your resume has moderate ATS compatibility. Adding relevant skills and keywords may improve the match.";
             } else if (score > 0) {
-
-                feedback.textContent =
-                    "Several improvements may be needed. Review the extracted skills and skill-gap analysis.";
-
+                text =
+                    "Your resume needs improvement for stronger ATS compatibility.";
             } else {
-
-                feedback.textContent =
-                    "Upload your resume to receive ATS feedback.";
+                text =
+                    "Upload a resume to calculate your ATS score.";
             }
+
+            feedback.textContent =
+                text;
         }
     }
 
@@ -3563,37 +2353,32 @@ document.addEventListener("DOMContentLoaded", function () {
        ======================================================== */
 
     function renderExtractedSkills() {
-
         const container =
             $("resume-skills-list");
-
 
         if (!container) {
             return;
         }
 
-
         if (
             !state.extractedSkills.length
         ) {
-
-            container.innerHTML = `
-                <span class="empty-state">
-                    No skills extracted yet.
-                </span>
-            `;
+            container.innerHTML =
+                `
+                    <p style="color:var(--text-muted);">
+                        No skills extracted yet.
+                    </p>
+                `;
 
             return;
         }
-
 
         container.innerHTML =
             state.extractedSkills
                 .map(
                     function (skill) {
-
                         return `
-                            <span class="skill-tag">
+                            <span class="skill-tag-matched">
                                 ${escapeHtml(skill)}
                             </span>
                         `;
@@ -3607,315 +2392,351 @@ document.addEventListener("DOMContentLoaded", function () {
        SKILL GAP
        ======================================================== */
 
-    function renderSkillGap() {
-
-        const userContainer =
-            $("skillgap-user-skills");
-
-        const requiredContainer =
-            $("skillgap-required-skills");
-
-        const missingContainer =
-            $("missing-skills-list");
-
-
-        if (userContainer) {
-
-            if (
-                state.extractedSkills.length
-            ) {
-
-                userContainer.innerHTML =
-                    state.extractedSkills
-                        .map(
-                            function (skill) {
-
-                                return `
-                                    <span class="skill-tag">
-                                        ${escapeHtml(skill)}
-                                    </span>
-                                `;
-                            }
-                        )
-                        .join("");
-
-            } else {
-
-                userContainer.innerHTML = `
-                    <span class="empty-state">
-                        Upload a resume to extract your skills.
-                    </span>
-                `;
-            }
-        }
-
-
-        if (requiredContainer) {
-
-            if (
-                state.requiredSkills.length
-            ) {
-
-                requiredContainer.innerHTML =
-                    state.requiredSkills
-                        .map(
-                            function (skill) {
-
-                                return `
-                                    <span class="skill-tag required">
-                                        ${escapeHtml(skill)}
-                                    </span>
-                                `;
-                            }
-                        )
-                        .join("");
-
-            } else {
-
-                requiredContainer.innerHTML = `
-                    <span class="empty-state">
-                        Fetch a career URL to identify required skills.
-                    </span>
-                `;
-            }
-        }
-
-
-        const userNormalized =
-            new Set(
-                state.extractedSkills.map(
-                    normalizeSkill
-                )
+    function calculateOverallSkillGap() {
+        const required =
+            normalizeSkills(
+                state.requiredSkills
             );
 
+        const extracted =
+            normalizeSkills(
+                state.extractedSkills
+            );
 
-        const missing =
-            state.requiredSkills.filter(
-                function (skill) {
-
-                    const normalized =
-                        normalizeSkill(
-                            skill
-                        );
-
-
-                    return !Array.from(
-                        userNormalized
-                    ).some(
-                        function (userSkill) {
-
+        const matched =
+            required.filter(
+                function (requiredSkill) {
+                    return extracted.some(
+                        function (skill) {
                             return (
-                                userSkill ===
-                                    normalized ||
-
-                                userSkill.includes(
-                                    normalized
-                                ) ||
-
-                                normalized.includes(
-                                    userSkill
-                                )
+                                skill
+                                    .toLowerCase()
+                                    .includes(
+                                        requiredSkill
+                                            .toLowerCase()
+                                    ) ||
+                                requiredSkill
+                                    .toLowerCase()
+                                    .includes(
+                                        skill
+                                            .toLowerCase()
+                                    )
                             );
                         }
                     );
                 }
             );
 
+        const missing =
+            required.filter(
+                function (skill) {
+                    return !matched.includes(
+                        skill
+                    );
+                }
+            );
 
-        if (missingContainer) {
+        return {
+            matched: matched,
+            missing: missing
+        };
+    }
 
-            if (missing.length) {
+    function renderSkillGap() {
+        const result =
+            calculateOverallSkillGap();
 
-                missingContainer.innerHTML =
-                    missing
+        const matchedBox =
+            $("matched-skills-tags");
+
+        const missingBox =
+            $("missing-skills-tags");
+
+        if (matchedBox) {
+            matchedBox.innerHTML =
+                result.matched.length
+                    ? result.matched
                         .map(
                             function (skill) {
-
                                 return `
-                                    <span class="skill-tag missing">
+                                    <span class="skill-tag-matched">
                                         ${escapeHtml(skill)}
                                     </span>
                                 `;
                             }
                         )
-                        .join("");
+                        .join("")
+                    : `
+                        <p style="color:var(--text-muted);">
+                            No matching skills detected yet.
+                        </p>
+                    `;
+        }
 
-            } else {
-
-                missingContainer.innerHTML = `
-                    <span class="empty-state">
-                        No missing skills detected.
-                    </span>
-                `;
-            }
+        if (missingBox) {
+            missingBox.innerHTML =
+                result.missing.length
+                    ? result.missing
+                        .map(
+                            function (skill) {
+                                return `
+                                    <span class="skill-tag-missing">
+                                        ${escapeHtml(skill)}
+                                    </span>
+                                `;
+                            }
+                        )
+                        .join("")
+                    : `
+                        <p style="color:var(--emerald);">
+                            All currently identified required skills are matched.
+                        </p>
+                    `;
         }
     }
 
 
     /* ========================================================
-       METRICS
+       DASHBOARD STATISTICS
        ======================================================== */
 
-    async function loadMetrics() {
+    function updateStats() {
+        const jobs =
+            state.careerJobs.length;
 
-        if (!state.loggedIn) {
-            return;
+        const required =
+            state.requiredSkills.length;
+
+        const extracted =
+            state.extractedSkills.length;
+
+        const gap =
+            calculateOverallSkillGap();
+
+        const matched =
+            gap.matched.length;
+
+        const readiness =
+            required > 0
+                ? Math.round(
+                    (
+                        matched /
+                        required
+                    ) * 100
+                )
+                : 0;
+
+        const values = {
+            "stat-jobs": jobs,
+            "metric-jobs": jobs,
+
+            "stat-skills": extracted,
+            "metric-skills": extracted,
+
+            "stat-required-skills":
+                required,
+
+            "metric-required-skills":
+                required,
+
+            "stat-matched":
+                matched,
+
+            "metric-matched":
+                matched,
+
+            "stat-readiness":
+                readiness + "%",
+
+            "metric-readiness":
+                readiness + "%",
+
+            "stat-ats":
+                Math.round(
+                    state.atsScore
+                ),
+
+            "metric-ats":
+                Math.round(
+                    state.atsScore
+                )
+        };
+
+        Object.keys(values).forEach(
+            function (id) {
+                const element =
+                    $(id);
+
+                if (element) {
+                    element.textContent =
+                        values[id];
+                }
+            }
+        );
+
+        const matchedCount =
+            $("metric-matched-count");
+
+        if (matchedCount) {
+            matchedCount.textContent =
+                `${matched} of ${required} Skills Matched`;
         }
 
+        const confidence =
+            $("metric-confidence");
 
-        try {
+        if (confidence) {
+            confidence.textContent =
+                required
+                    ? readiness + "%"
+                    : "0%";
+        }
 
-            const result =
-                await apiRequest(
-                    "get_metrics",
-                    {
-                        target_company:
-                            state.targetCompany,
+        const strength =
+            $("metric-strength");
 
-                        target_role:
-                            state.targetRole,
-
-                        required_skills:
-                            JSON.stringify(
-                                state.requiredSkills
-                            )
-                    }
-                );
-
-
-            if (
-                !apiSuccess(result)
-            ) {
-
-                updateStats();
-
-                return;
+        if (strength) {
+            if (readiness >= 80) {
+                strength.textContent =
+                    "Strong";
+            } else if (readiness >= 60) {
+                strength.textContent =
+                    "Moderate";
+            } else {
+                strength.textContent =
+                    "Needs Improvement";
             }
-
-
-            if (
-                result.ats_score != null
-            ) {
-
-                state.atsScore =
-                    Number(
-                        result.ats_score
-                    );
-            }
-
-
-            if (
-                Array.isArray(
-                    result.extracted_skills
-                )
-            ) {
-
-                state.extractedSkills =
-                    normalizeSkills(
-                        result.extracted_skills
-                    );
-            }
-
-
-            if (
-                Array.isArray(
-                    result.required_skills
-                )
-            ) {
-
-                state.requiredSkills =
-                    normalizeSkills(
-                        result.required_skills
-                    );
-            }
-
-
-            renderATS();
-
-            renderExtractedSkills();
-
-            renderSkillGap();
-
-            updateStats();
-
-            renderDashboardCharts();
-
-
-        } catch (error) {
-
-            console.warn(
-                "Metrics unavailable:",
-                error.message
-            );
-
-
-            updateStats();
         }
     }
 
 
     /* ========================================================
-       DASHBOARD CHARTS
+       CHARTS
        ======================================================== */
 
     function initCharts() {
-
         if (
             typeof Chart ===
             "undefined"
         ) {
-
             return;
         }
 
+        const radarCanvas =
+            $("radarChartCtx");
 
-        const skillsCanvas =
-            $("skills-chart");
+        const pieCanvas =
+            $("pieChartCtx");
 
-        const readinessCanvas =
-            $("readiness-chart");
-
-
-        if (skillsCanvas) {
-
-            state.charts.skills =
+        if (radarCanvas) {
+            state.charts.radar =
                 new Chart(
-                    skillsCanvas,
+                    radarCanvas,
+                    {
+                        type: "radar",
+
+                        data: {
+                            labels: [
+                                "Technical Skills",
+                                "ATS Compatibility",
+                                "Projects",
+                                "Core CS",
+                                "Role Fit"
+                            ],
+
+                            datasets: [
+                                {
+                                    label:
+                                        "Score",
+
+                                    data: [
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        0
+                                    ],
+
+                                    backgroundColor:
+                                        "rgba(99,102,241,.25)",
+
+                                    borderColor:
+                                        "#6366f1",
+
+                                    pointBackgroundColor:
+                                        "#38bdf8"
+                                }
+                            ]
+                        },
+
+                        options: {
+                            responsive:
+                                true,
+
+                            maintainAspectRatio:
+                                false,
+
+                            scales: {
+                                r: {
+                                    min: 0,
+                                    max: 100,
+
+                                    ticks: {
+                                        display:
+                                            false
+                                    }
+                                }
+                            },
+
+                            plugins: {
+                                legend: {
+                                    display:
+                                        false
+                                }
+                            }
+                        }
+                    }
+                );
+        }
+
+        if (pieCanvas) {
+            state.charts.pie =
+                new Chart(
+                    pieCanvas,
                     {
                         type:
                             "doughnut",
 
                         data: {
-
                             labels: [
-                                "Your Skills",
-                                "Skill Gap"
+                                "Matched Skills",
+                                "Missing Skills"
                             ],
 
                             datasets: [
                                 {
                                     data: [
-                                        state.extractedSkills.length,
+                                        0,
+                                        0
+                                    ],
 
-                                        Math.max(
-                                            state.requiredSkills.length -
-                                            state.extractedSkills.length,
-                                            0
-                                        )
+                                    backgroundColor: [
+                                        "#10b981",
+                                        "#f43f5e"
                                     ]
                                 }
                             ]
                         },
 
                         options: {
-
                             responsive:
                                 true,
 
+                            maintainAspectRatio:
+                                false,
+
                             plugins: {
-
                                 legend: {
-
                                     position:
                                         "bottom"
                                 }
@@ -3925,157 +2746,80 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
         }
 
-
-        if (readinessCanvas) {
-
-            state.charts.readiness =
-                new Chart(
-                    readinessCanvas,
-                    {
-                        type:
-                            "doughnut",
-
-                        data: {
-
-                            labels: [
-                                "ATS",
-                                "Remaining"
-                            ],
-
-                            datasets: [
-                                {
-                                    data: [
-                                        Math.round(
-                                            state.atsScore
-                                        ),
-
-                                        Math.max(
-                                            100 -
-                                            Math.round(
-                                                state.atsScore
-                                            ),
-                                            0
-                                        )
-                                    ]
-                                }
-                            ]
-                        },
-
-                        options: {
-
-                            responsive:
-                                true,
-
-                            plugins: {
-
-                                legend: {
-
-                                    position:
-                                        "bottom"
-                                }
-                            }
-                        }
-                    }
-                );
-        }
+        updateDashboardCharts();
     }
 
+    function updateDashboardCharts() {
+        const required =
+            state.requiredSkills.length;
+
+        const extracted =
+            state.extractedSkills.length;
+
+        const gap =
+            calculateOverallSkillGap();
+
+        const readiness =
+            required
+                ? Math.round(
+                    (
+                        gap.matched.length /
+                        required
+                    ) * 100
+                )
+                : 0;
+
+        if (state.charts.radar) {
+            state.charts.radar.data.datasets[0].data =
+                [
+                    Math.min(
+                        100,
+                        extracted * 8
+                    ),
+
+                    Number(
+                        state.atsScore || 0
+                    ),
+
+                    Math.min(
+                        100,
+                        state.careerJobs.length * 10
+                    ),
+
+                    Math.min(
+                        100,
+                        extracted * 7
+                    ),
+
+                    readiness
+                ];
+
+            state.charts.radar.update();
+        }
+
+        if (state.charts.pie) {
+            state.charts.pie.data.datasets[0].data =
+                [
+                    gap.matched.length,
+                    gap.missing.length
+                ];
+
+            state.charts.pie.update();
+        }
+    }
 
     function renderDashboardCharts() {
-
-        if (
-            state.charts.skills
-        ) {
-
-            state.charts.skills.data
-                .datasets[0]
-                .data = [
-
-                    state.extractedSkills.length,
-
-                    Math.max(
-                        state.requiredSkills.length -
-                        state.extractedSkills.length,
-                        0
-                    )
-                ];
-
-
-            state.charts.skills.update();
-        }
-
-
-        if (
-            state.charts.readiness
-        ) {
-
-            const score =
-                Math.round(
-                    state.atsScore || 0
-                );
-
-
-            state.charts.readiness.data
-                .datasets[0]
-                .data = [
-
-                    score,
-
-                    Math.max(
-                        100 - score,
-                        0
-                    )
-                ];
-
-
-            state.charts.readiness.update();
-        }
+        updateDashboardCharts();
     }
 
-
-    /* ========================================================
-       JOB PAGE RANK BUTTON
-       ======================================================== */
-
-    function initJobRanking() {
-
-        const button =
-            $("rank-career-jobs");
-
-        const input =
-            $("jobs-career-url");
-
-
-        if (!button || !input) {
-            return;
+    function updateChartsTheme() {
+        if (state.charts.radar) {
+            state.charts.radar.update();
         }
 
-
-        button.addEventListener(
-            "click",
-            function () {
-
-                const url =
-                    input.value.trim();
-
-
-                if (!url) {
-
-                    showPopup(
-                        "Career URL Required",
-                        "Please enter a career URL.",
-                        "warning"
-                    );
-
-                    return;
-                }
-
-
-                scrapeCareerUrl(
-                    url
-                );
-            }
-        );
+        if (state.charts.pie) {
+            state.charts.pie.update();
+        }
     }
 
 
@@ -4083,753 +2827,875 @@ document.addEventListener("DOMContentLoaded", function () {
        ROADMAP
        ======================================================== */
 
-    async function loadRoadmap() {
-
+    async function loadDynamicRoadmap() {
         const container =
             $("container-dynamic-roadmap");
 
         const resources =
             $("container-dynamic-resources");
 
-
         if (!container) {
             return;
         }
 
+        const gap =
+            calculateOverallSkillGap();
 
-        if (
-            !state.extractedSkills.length &&
-            !state.requiredSkills.length
-        ) {
+        const formData =
+            new FormData();
 
-            container.innerHTML = `
-                <div class="empty-state-card">
-                    <h3>Roadmap not available yet</h3>
-                    <p>
-                        Upload your resume and fetch a career URL
-                        before generating your roadmap.
-                    </p>
-                </div>
-            `;
+        formData.append(
+            "action",
+            "get_roadmap"
+        );
 
+        formData.append(
+            "missing_skills",
+            JSON.stringify(
+                gap.missing
+            )
+        );
 
-            if (resources) {
-                resources.innerHTML =
-                    "";
-            }
+        formData.append(
+            "target_company",
+            state.targetCompany || ""
+        );
 
-
-            return;
-        }
-
-
-        container.innerHTML = `
-            <div class="loading-state">
-                Generating your learning roadmap...
-            </div>
-        `;
-
+        formData.append(
+            "target_role",
+            state.targetRole || ""
+        );
 
         try {
-
             const result =
                 await apiRequest(
                     "get_roadmap",
-                    {
-                        required_skills:
-                            JSON.stringify(
-                                state.requiredSkills
-                            ),
-
-                        extracted_skills:
-                            JSON.stringify(
-                                state.extractedSkills
-                            ),
-
-                        target_role:
-                            state.targetRole ||
-                            ""
-                    }
+                    formData
                 );
-
 
             if (
-                !apiSuccess(result)
+                !apiSuccess(result) ||
+                !result.roadmap
             ) {
-
-                throw new Error(
-                    result.message ||
-                    "Unable to generate roadmap."
-                );
+                return;
             }
 
-
             const roadmap =
-                result.roadmap ||
-                result.data?.roadmap ||
-                [];
+                result.roadmap;
 
-
-            const resourceList =
-                result.resources ||
-                result.data?.resources ||
-                [];
-
-
-            renderRoadmap(
-                roadmap
-            );
-
-            renderResources(
-                resourceList
-            );
-
-
-        } catch (error) {
-
-            container.innerHTML = `
-                <div class="empty-state-card">
-                    <h3>Roadmap unavailable</h3>
-                    <p>
-                        ${escapeHtml(
-                            error.message ||
-                            "Unable to generate roadmap."
-                        )}
-                    </p>
-                </div>
-            `;
-        }
-    }
-
-
-    function renderRoadmap(
-        roadmap
-    ) {
-
-        const container =
-            $("container-dynamic-roadmap");
-
-
-        if (!container) {
-            return;
-        }
-
-
-        if (
-            !Array.isArray(
-                roadmap
-            )
-        ) {
-
-            container.innerHTML = `
-                <div class="empty-state-card">
-                    <h3>Roadmap unavailable</h3>
-                    <p>
-                        No roadmap data was returned.
-                    </p>
-                </div>
-            `;
-
-            return;
-        }
-
-
-        if (!roadmap.length) {
-
-            container.innerHTML = `
-                <div class="empty-state-card">
-                    <h3>No additional roadmap steps</h3>
-                    <p>
-                        No missing skills were identified.
-                    </p>
-                </div>
-            `;
-
-            return;
-        }
-
-
-        container.innerHTML =
-            roadmap.map(
-                function (item, index) {
-
-                    if (
-                        typeof item ===
-                        "string"
-                    ) {
-
-                        return `
-                            <div class="roadmap-step">
-
-                                <div class="roadmap-number">
-                                    ${index + 1}
-                                </div>
-
-                                <div>
-                                    ${escapeHtml(item)}
-                                </div>
-
-                            </div>
-                        `;
-                    }
-
-
-                    const title =
-                        item.title ||
-                        item.skill ||
-                        item.name ||
-                        "Learning Step";
-
-
-                    const description =
-                        item.description ||
-                        item.details ||
-                        "";
-
-
-                    return `
-                        <div class="roadmap-step">
-
-                            <div class="roadmap-number">
-                                ${index + 1}
-                            </div>
-
-                            <div>
-
-                                <h3>
-                                    ${escapeHtml(title)}
-                                </h3>
-
-                                <p>
-                                    ${escapeHtml(description)}
-                                </p>
-
-                            </div>
-
-                        </div>
-                    `;
-                }
-            ).join("");
-    }
-
-
-    function renderResources(
-        resources
-    ) {
-
-        const container =
-            $("container-dynamic-resources");
-
-
-        if (!container) {
-            return;
-        }
-
-
-        if (
-            !Array.isArray(resources) ||
-            !resources.length
-        ) {
+            const phases =
+                Array.isArray(
+                    roadmap.phases
+                )
+                    ? roadmap.phases
+                    : [];
 
             container.innerHTML =
-                "";
-
-            return;
-        }
-
-
-        container.innerHTML = `
-            <div class="content-card">
-
-                <div class="card-header">
-                    <h3>Learning Resources</h3>
-                </div>
-
-                <div class="resource-list">
-
-                    ${
-                        resources.map(
-                            function (resource) {
-
-                                if (
-                                    typeof resource ===
-                                    "string"
-                                ) {
-
-                                    return `
-                                        <div class="resource-item">
-                                            ${escapeHtml(resource)}
-                                        </div>
-                                    `;
-                                }
-
-
-                                const title =
-                                    resource.title ||
-                                    resource.name ||
-                                    "Resource";
-
-
-                                const url =
-                                    resource.url ||
-                                    resource.link ||
-                                    "";
-
-
-                                if (url) {
-
-                                    return `
-                                        <a
-                                            href="${escapeHtml(url)}"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            class="resource-item"
-                                        >
-                                            ${escapeHtml(title)}
-                                        </a>
-                                    `;
-                                }
-
-
+                phases.length
+                    ? phases
+                        .map(
+                            function (phase) {
                                 return `
-                                    <div class="resource-item">
-                                        ${escapeHtml(title)}
+                                    <div class="roadmap-phase-card">
+
+                                        <div class="roadmap-phase-title">
+                                            ${escapeHtml(
+                                                phase.phase || ""
+                                            )}
+                                            ${
+                                                phase.objective
+                                                    ? " — " +
+                                                      escapeHtml(
+                                                          phase.objective
+                                                      )
+                                                    : ""
+                                            }
+                                        </div>
+
+                                        ${
+                                            phase.duration
+                                                ? `
+                                                    <div class="roadmap-phase-duration">
+                                                        Timeline:
+                                                        ${escapeHtml(
+                                                            phase.duration
+                                                        )}
+                                                    </div>
+                                                `
+                                                : ""
+                                        }
+
+                                        ${
+                                            Array.isArray(
+                                                phase.skills
+                                            ) &&
+                                            phase.skills.length
+                                                ? `
+                                                    <p>
+                                                        <strong>
+                                                            Target Skills:
+                                                        </strong>
+                                                        ${escapeHtml(
+                                                            phase.skills.join(
+                                                                ", "
+                                                            )
+                                                        )}
+                                                    </p>
+                                                `
+                                                : ""
+                                        }
+
+                                        ${
+                                            Array.isArray(
+                                                phase.action_items
+                                            ) &&
+                                            phase.action_items.length
+                                                ? `
+                                                    <ul>
+                                                        ${phase.action_items
+                                                            .map(
+                                                                function (
+                                                                    item
+                                                                ) {
+                                                                    return `
+                                                                        <li>
+                                                                            ${escapeHtml(
+                                                                                item
+                                                                            )}
+                                                                        </li>
+                                                                    `;
+                                                                }
+                                                            )
+                                                            .join("")}
+                                                    </ul>
+                                                `
+                                                : ""
+                                        }
+
                                     </div>
                                 `;
                             }
-                        ).join("")
-                    }
+                        )
+                        .join("")
+                    : `
+                        <div class="empty-state">
+                            <p>
+                                Upload a resume and analyze a career URL
+                                to generate a personalized roadmap.
+                            </p>
+                        </div>
+                    `;
 
-                </div>
+            if (
+                resources
+            ) {
+                const resourceList =
+                    Array.isArray(
+                        roadmap.resources
+                    )
+                        ? roadmap.resources
+                        : [];
 
-            </div>
-        `;
+                resources.innerHTML =
+                    resourceList
+                        .map(
+                            function (resource) {
+                                return `
+                                    <details>
+                                        <summary>
+                                            ${escapeHtml(
+                                                resource.skill || "Learning Resource"
+                                            )}
+                                        </summary>
+
+                                        <div style="padding:12px;">
+
+                                            ${
+                                                resource.platform
+                                                    ? `
+                                                        <p>
+                                                            <strong>
+                                                                Platform:
+                                                            </strong>
+                                                            ${escapeHtml(
+                                                                resource.platform
+                                                            )}
+                                                        </p>
+                                                    `
+                                                    : ""
+                                            }
+
+                                            ${
+                                                resource.time
+                                                    ? `
+                                                        <p>
+                                                            <strong>
+                                                                Estimated Time:
+                                                            </strong>
+                                                            ${escapeHtml(
+                                                                resource.time
+                                                            )}
+                                                        </p>
+                                                    `
+                                                    : ""
+                                            }
+
+                                            ${
+                                                resource.docs
+                                                    ? `
+                                                        <p>
+                                                            <strong>
+                                                                Documentation:
+                                                            </strong>
+                                                            <a
+                                                                href="${escapeHtml(
+                                                                    resource.docs
+                                                                )}"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                            >
+                                                                Open Documentation
+                                                            </a>
+                                                        </p>
+                                                    `
+                                                    : ""
+                                            }
+
+                                            ${
+                                                resource.project
+                                                    ? `
+                                                        <p>
+                                                            <strong>
+                                                                Project:
+                                                            </strong>
+                                                            ${escapeHtml(
+                                                                resource.project
+                                                            )}
+                                                        </p>
+                                                    `
+                                                    : ""
+                                            }
+
+                                        </div>
+                                    </details>
+                                `;
+                            }
+                        )
+                        .join("");
+            }
+
+        } catch (error) {
+            console.error(
+                "Roadmap error:",
+                error
+            );
+        }
     }
 
 
     /* ========================================================
-       INTERVIEW
+       INTERVIEW PREPARATION
        ======================================================== */
 
-    function prepareInterview() {
+    async function loadDynamicInterview() {
+        const container =
+            $("container-dynamic-interview");
 
-        const question =
-            $("interview-question");
-
-
-        if (
-            question &&
-            !question.dataset.initialized
-        ) {
-
-            question.dataset.initialized =
-                "true";
-
-            question.textContent =
-                "Generate an interview question to begin.";
-        }
-    }
-
-
-    function initInterview() {
-
-        const generate =
-            $("generate-interview-question");
-
-        const submit =
-            $("submit-interview-answer");
-
-
-        if (generate) {
-
-            generate.addEventListener(
-                "click",
-                generateInterviewQuestion
-            );
+        if (!container) {
+            return;
         }
 
+        const gap =
+            calculateOverallSkillGap();
 
-        if (submit) {
+        const formData =
+            new FormData();
 
-            submit.addEventListener(
-                "click",
-                submitInterviewAnswer
-            );
-        }
-    }
-
-
-    async function generateInterviewQuestion() {
-
-        const button =
-            $("generate-interview-question");
-
-        const question =
-            $("interview-question");
-
-
-        setLoading(
-            button,
-            true,
-            "Generating..."
+        formData.append(
+            "action",
+            "get_interview"
         );
 
+        formData.append(
+            "target_role",
+            state.targetRole || ""
+        );
+
+        formData.append(
+            "matched_skills",
+            JSON.stringify(
+                gap.matched
+            )
+        );
+
+        formData.append(
+            "missing_skills",
+            JSON.stringify(
+                gap.missing
+            )
+        );
 
         try {
-
             const result =
                 await apiRequest(
                     "get_interview",
-                    {
-                        target_role:
-                            state.targetRole ||
-                            "",
-
-                        extracted_skills:
-                            JSON.stringify(
-                                state.extractedSkills
-                            ),
-
-                        required_skills:
-                            JSON.stringify(
-                                state.requiredSkills
-                            )
-                    }
+                    formData
                 );
-
 
             if (
                 !apiSuccess(result)
             ) {
-
-                throw new Error(
-                    result.message ||
-                    "Unable to generate question."
-                );
+                return;
             }
 
+            const prep =
+                result.prep_data ||
+                result.data ||
+                {};
 
-            const generated =
-                result.question ||
-                result.interview_question ||
-                result.data?.question ||
-                "Tell me about your most relevant technical project.";
+            let html =
+                "";
 
+            if (
+                Array.isArray(
+                    prep.technical_known
+                )
+            ) {
+                html +=
+                    `
+                        <h4>
+                            Technical Questions
+                        </h4>
+                    `;
 
-            if (question) {
+                html +=
+                    prep.technical_known
+                        .map(
+                            function (
+                                item,
+                                index
+                            ) {
+                                return `
+                                    <details>
+                                        <summary>
+                                            Q${index + 1}:
+                                            ${escapeHtml(
+                                                item.q || ""
+                                            )}
+                                        </summary>
 
-                question.textContent =
-                    generated;
+                                        <div style="padding:12px;">
+                                            <p>
+                                                <strong>
+                                                    Answer:
+                                                </strong>
+                                                ${escapeHtml(
+                                                    item.a || ""
+                                                )}
+                                            </p>
+
+                                            ${
+                                                item.tip
+                                                    ? `
+                                                        <p>
+                                                            <strong>
+                                                                Tip:
+                                                            </strong>
+                                                            ${escapeHtml(
+                                                                item.tip
+                                                            )}
+                                                        </p>
+                                                    `
+                                                    : ""
+                                            }
+                                        </div>
+                                    </details>
+                                `;
+                            }
+                        )
+                        .join("");
             }
 
+            if (
+                Array.isArray(
+                    prep.gap_questions
+                )
+            ) {
+                html +=
+                    `
+                        <h4 style="margin-top:20px;">
+                            Skill-Gap Questions
+                        </h4>
+                    `;
 
-            const answer =
-                $("interview-answer");
+                html +=
+                    prep.gap_questions
+                        .map(
+                            function (
+                                item,
+                                index
+                            ) {
+                                return `
+                                    <details>
+                                        <summary>
+                                            Gap Question ${index + 1}:
+                                            ${escapeHtml(
+                                                item.q || ""
+                                            )}
+                                        </summary>
 
-
-            if (answer) {
-
-                answer.value =
-                    "";
+                                        <div style="padding:12px;">
+                                            <p>
+                                                <strong>
+                                                    Answer:
+                                                </strong>
+                                                ${escapeHtml(
+                                                    item.a || ""
+                                                )}
+                                            </p>
+                                        </div>
+                                    </details>
+                                `;
+                            }
+                        )
+                        .join("");
             }
 
+            if (
+                Array.isArray(
+                    prep.behavioral
+                )
+            ) {
+                html +=
+                    `
+                        <h4 style="margin-top:20px;">
+                            HR & Behavioral Questions
+                        </h4>
+                    `;
 
-            const feedback =
-                $("interview-feedback");
+                html +=
+                    prep.behavioral
+                        .map(
+                            function (
+                                item,
+                                index
+                            ) {
+                                return `
+                                    <details>
+                                        <summary>
+                                            HR Q${index + 1}:
+                                            ${escapeHtml(
+                                                item.q || ""
+                                            )}
+                                        </summary>
 
+                                        <div style="padding:12px;">
+                                            ${
+                                                item.framework
+                                                    ? `
+                                                        <p>
+                                                            <strong>
+                                                                Framework:
+                                                            </strong>
+                                                            ${escapeHtml(
+                                                                item.framework
+                                                            )}
+                                                        </p>
+                                                    `
+                                                    : ""
+                                            }
 
-            if (feedback) {
-
-                feedback.innerHTML =
-                    "";
+                                            ${
+                                                item.guide
+                                                    ? `
+                                                        <p>
+                                                            ${escapeHtml(
+                                                                item.guide
+                                                            )}
+                                                        </p>
+                                                    `
+                                                    : ""
+                                            }
+                                        </div>
+                                    </details>
+                                `;
+                            }
+                        )
+                        .join("");
             }
 
+            if (!html) {
+                html =
+                    `
+                        <div class="empty-state">
+                            <p>
+                                Interview preparation will appear
+                                after your resume and career data
+                                are analyzed.
+                            </p>
+                        </div>
+                    `;
+            }
+
+            container.innerHTML =
+                html;
 
         } catch (error) {
-
-            showPopup(
-                "Interview Question",
-                error.message ||
-                "Unable to generate question.",
-                "error"
-            );
-
-
-        } finally {
-
-            setLoading(
-                button,
-                false
+            console.error(
+                "Interview preparation error:",
+                error
             );
         }
     }
 
 
-    async function submitInterviewAnswer() {
+    /* ========================================================
+       JOB RANKING
+       ======================================================== */
 
-        const answer =
-            $("interview-answer");
+    function initJobRanking() {
+        const filter =
+            $("select-job-domain-filter");
 
-        const question =
-            $("interview-question");
+        const search =
+            $("input-job-search");
 
-        const feedback =
-            $("interview-feedback");
+        if (filter) {
+            filter.addEventListener(
+                "change",
+                loadRankedJobs
+            );
+        }
 
-        const button =
-            $("submit-interview-answer");
+        if (search) {
+            search.addEventListener(
+                "input",
+                function () {
+                    renderLocalJobRanking(
+                        search.value
+                    );
+                }
+            );
+        }
 
+        loadRankedJobs();
+    }
 
-        const answerText =
-            answer?.value.trim() ||
-            "";
+    async function loadRankedJobs() {
+        const filter =
+            $("select-job-domain-filter");
 
-        const questionText =
-            question?.textContent.trim() ||
-            "";
+        const search =
+            $("input-job-search");
 
-
-        if (!answerText) {
-
-            showPopup(
-                "Answer Required",
-                "Please write your answer before submitting.",
-                "warning"
+        if (!state.careerJobs.length) {
+            renderLocalJobRanking(
+                search?.value || ""
             );
 
             return;
         }
 
-
-        setLoading(
-            button,
-            true,
-            "Evaluating..."
+        renderLocalJobRanking(
+            search?.value || ""
         );
 
-
+        /*
+         * The local ranking is intentionally used as a fallback.
+         * If the backend supports rank_jobs, use it too.
+         */
         try {
+            const formData =
+                new FormData();
+
+            formData.append(
+                "action",
+                "rank_jobs"
+            );
+
+            formData.append(
+                "domain_filter",
+                filter?.value || ""
+            );
 
             const result =
                 await apiRequest(
-                    "evaluate_answer",
-                    {
-                        question:
-                            questionText,
-
-                        answer:
-                            answerText,
-
-                        target_role:
-                            state.targetRole ||
-                            ""
-                    }
+                    "rank_jobs",
+                    formData
                 );
-
 
             if (
-                !apiSuccess(result)
+                apiSuccess(result) &&
+                Array.isArray(result.jobs)
             ) {
-
-                throw new Error(
-                    result.message ||
-                    "Unable to evaluate answer."
+                renderJobTable(
+                    result.jobs,
+                    search?.value || ""
                 );
             }
 
-
-            const evaluation =
-                result.feedback ||
-                result.evaluation ||
-                result.data?.feedback ||
-                "Answer evaluated successfully.";
-
-
-            if (feedback) {
-
-                feedback.innerHTML = `
-                    <strong>Feedback</strong>
-                    <p>
-                        ${escapeHtml(
-                            evaluation
-                        )}
-                    </p>
-                `;
-            }
-
-
         } catch (error) {
-
-            showPopup(
-                "Interview Evaluation",
-                error.message ||
-                "Unable to evaluate answer.",
-                "error"
-            );
-
-
-        } finally {
-
-            setLoading(
-                button,
-                false
+            console.warn(
+                "Backend ranking unavailable. Using local ranking.",
+                error
             );
         }
     }
 
+    function renderLocalJobRanking(
+        query
+    ) {
+        const jobs =
+            state.careerJobs.map(
+                function (job) {
+                    const match =
+                        calculateJobMatch(
+                            job
+                        );
+
+                    return {
+                        company:
+                            job.company || "",
+
+                        role:
+                            job.title || "",
+
+                        domain:
+                            "",
+
+                        match_pct:
+                            match.percentage,
+
+                        matched_count:
+                            match.matched.length,
+
+                        total_count:
+                            job.skills.length,
+
+                        fit_label:
+                            match.percentage >= 80
+                                ? "High Match"
+                                : match.percentage >= 50
+                                    ? "Moderate Match"
+                                    : "Needs Improvement",
+
+                        missing_skills:
+                            match.missing
+                    };
+                }
+            );
+
+        renderJobTable(
+            jobs,
+            query
+        );
+    }
+
+    function renderJobTable(
+        jobs,
+        query
+    ) {
+        const tbody =
+            $("tbody-job-ranking");
+
+        if (!tbody) {
+            return;
+        }
+
+        query =
+            String(
+                query || ""
+            ).toLowerCase();
+
+        const filtered =
+            (Array.isArray(jobs)
+                ? jobs
+                : []
+            ).filter(
+                function (job) {
+                    return (
+                        !query ||
+                        String(
+                            job.company || ""
+                        )
+                            .toLowerCase()
+                            .includes(query) ||
+                        String(
+                            job.role || ""
+                        )
+                            .toLowerCase()
+                            .includes(query)
+                    );
+                }
+            );
+
+        tbody.innerHTML =
+            filtered.length
+                ? filtered
+                    .map(
+                        function (job) {
+                            return `
+                                <tr>
+                                    <td>
+                                        <strong>
+                                            ${escapeHtml(
+                                                job.company || ""
+                                            )}
+                                        </strong>
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(
+                                            job.role || ""
+                                        )}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(
+                                            job.domain || ""
+                                        )}
+                                    </td>
+
+                                    <td>
+                                        <strong>
+                                            ${Number(
+                                                job.match_pct || 0
+                                            )}%
+                                        </strong>
+                                    </td>
+
+                                    <td>
+                                        ${Number(
+                                            job.matched_count || 0
+                                        )}
+                                        /
+                                        ${Number(
+                                            job.total_count || 0
+                                        )}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(
+                                            job.fit_label || ""
+                                        )}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(
+                                            Array.isArray(
+                                                job.missing_skills
+                                            )
+                                                ? job.missing_skills
+                                                    .slice(0, 3)
+                                                    .join(", ")
+                                                : ""
+                                        )}
+                                    </td>
+                                </tr>
+                            `;
+                        }
+                    )
+                    .join("")
+                : `
+                    <tr>
+                        <td colspan="7">
+                            No matching jobs found.
+                        </td>
+                    </tr>
+                `;
+    }
+
 
     /* ========================================================
-       AI ASSISTANT
+       SKILL EDITOR
        ======================================================== */
 
-    function initAIAssistant() {
-
+    function initSkillEditor() {
         const button =
-            $("btn-submit-ai-prompt");
-
+            $("btn-update-skills-live");
 
         if (!button) {
             return;
         }
 
-
         button.addEventListener(
             "click",
-            submitAIPrompt
-        );
-    }
-
-
-    async function submitAIPrompt() {
-
-        const input =
-            $("input-ai-prompt");
-
-        const responseCard =
-            $("ai-assistant-response-card");
-
-        const title =
-            $("ai-response-title");
-
-        const body =
-            $("ai-response-body");
-
-        const button =
-            $("btn-submit-ai-prompt");
-
-
-        const prompt =
-            input?.value.trim() ||
-            "";
-
-
-        if (!prompt) {
-
-            showPopup(
-                "Question Required",
-                "Please enter a question for the career assistant.",
-                "warning"
-            );
-
-            return;
-        }
-
-
-        setLoading(
-            button,
-            true,
-            "Thinking..."
-        );
-
-
-        try {
-
-            const result =
-                await apiRequest(
-                    "ask_interview_ai",
-                    {
-                        prompt:
-                            prompt,
-
-                        target_role:
-                            state.targetRole ||
-                            "",
-
-                        extracted_skills:
-                            JSON.stringify(
-                                state.extractedSkills
-                            ),
-
-                        required_skills:
-                            JSON.stringify(
-                                state.requiredSkills
-                            )
-                    }
-                );
-
-
-            if (
-                !apiSuccess(result)
-            ) {
-
-                throw new Error(
-                    result.message ||
-                    "AI assistant request failed."
-                );
-            }
-
-
-            const response =
-                result.response ||
-                result.answer ||
-                result.data?.response ||
-                result.data?.answer ||
-                "No response was returned.";
-
-
-            if (responseCard) {
-
-                responseCard.style.display =
-                    "block";
-            }
-
-
-            if (title) {
-
-                title.textContent =
-                    "Career Assistant";
-            }
-
-
-            if (body) {
-
-                body.innerHTML =
-                    escapeHtml(
-                        response
-                    ).replace(
-                        /\n/g,
-                        "<br>"
+            async function () {
+                const checked =
+                    qsa(
+                        ".active-profile-skill-checkbox:checked"
                     );
+
+                const skills =
+                    checked.map(
+                        function (checkbox) {
+                            return checkbox.value;
+                        }
+                    );
+
+                const formData =
+                    new FormData();
+
+                formData.append(
+                    "action",
+                    "update_skills"
+                );
+
+                formData.append(
+                    "skills",
+                    JSON.stringify(
+                        skills
+                    )
+                );
+
+                try {
+                    const result =
+                        await apiRequest(
+                            "update_skills",
+                            formData
+                        );
+
+                    if (
+                        !apiSuccess(
+                            result
+                        )
+                    ) {
+                        throw new Error(
+                            result.message ||
+                            "Unable to update skills."
+                        );
+                    }
+
+                    state.extractedSkills =
+                        normalizeSkills(
+                            result.skills ||
+                            result.extracted_skills ||
+                            skills
+                        );
+
+                    updateGlobalData();
+
+                    renderExtractedSkills();
+                    renderSkillGap();
+                    updateStats();
+                    renderDashboardCharts();
+
+                    showPopup(
+                        "Skills Updated",
+                        "Your active skills have been updated.",
+                        "success"
+                    );
+
+                } catch (error) {
+                    showPopup(
+                        "Skill Update Failed",
+                        error.message ||
+                        "Unable to update skills.",
+                        "error"
+                    );
+                }
             }
-
-
-        } catch (error) {
-
-            showPopup(
-                "Career Assistant",
-                error.message ||
-                "Unable to process your question.",
-                "error"
-            );
-
-
-        } finally {
-
-            setLoading(
-                button,
-                false
-            );
-        }
+        );
     }
 
 
@@ -4838,63 +3704,43 @@ document.addEventListener("DOMContentLoaded", function () {
        ======================================================== */
 
     function initProfileForm() {
-
         const form =
-            $("profile-form");
-
+            $("form-update-profile");
 
         if (!form) {
             return;
         }
 
-
         form.addEventListener(
             "submit",
             async function (event) {
-
                 event.preventDefault();
 
+                const formData =
+                    new FormData(form);
 
-                const data =
-                    new FormData(
-                        form
-                    );
-
+                formData.set(
+                    "action",
+                    "update_profile"
+                );
 
                 try {
-
                     const result =
                         await apiRequest(
                             "update_profile",
-                            data
+                            formData
                         );
 
-
                     if (
-                        !apiSuccess(result)
+                        !apiSuccess(
+                            result
+                        )
                     ) {
-
                         throw new Error(
                             result.message ||
-                            result.error ||
                             "Unable to update profile."
                         );
                     }
-
-
-                    const message =
-                        $("profile-message");
-
-
-                    if (message) {
-
-                        message.textContent =
-                            "Profile updated successfully.";
-
-                        message.className =
-                            "inline-status success";
-                    }
-
 
                     showPopup(
                         "Profile Updated",
@@ -4902,24 +3748,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         "success"
                     );
 
-
                 } catch (error) {
-
-                    const message =
-                        $("profile-message");
-
-
-                    if (message) {
-
-                        message.textContent =
-                            error.message ||
-                            "Unable to update profile.";
-
-                        message.className =
-                            "inline-status error";
-                    }
-
-
                     showPopup(
                         "Profile Update Failed",
                         error.message ||
@@ -4933,61 +3762,601 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
     /* ========================================================
-       LOGOUT
+       AI INTERVIEW ASSISTANT
        ======================================================== */
 
-    function initLogout() {
+    function initAIInterviewAssistant() {
+        const tabAssistant =
+            $("tab-btn-ai-assistant");
 
-        const button =
-            $("btn-logout");
+        const tabEvaluator =
+            $("tab-btn-ai-evaluator");
 
+        const tabQuestions =
+            $("tab-btn-ai-questions");
 
-        if (!button) {
-            return;
-        }
+        const subAssistant =
+            $("subtab-ai-assistant");
 
+        const subEvaluator =
+            $("subtab-ai-evaluator");
 
-        button.addEventListener(
-            "click",
-            async function () {
+        const subQuestions =
+            $("subtab-ai-questions");
 
-                try {
-
-                    const result =
-                        await apiRequest(
-                            "logout",
-                            {}
-                        );
-
-
-                    if (
-                        apiSuccess(result)
-                    ) {
-
-                        window.location.replace(
-                            window.location.pathname
-                        );
-
-                    } else {
-
-                        throw new Error(
-                            result.message ||
-                            "Unable to logout."
+        function activateTab(
+            activeTab,
+            activeSub
+        ) {
+            [
+                tabAssistant,
+                tabEvaluator,
+                tabQuestions
+            ].forEach(
+                function (tab) {
+                    if (tab) {
+                        tab.classList.remove(
+                            "active"
                         );
                     }
+                }
+            );
 
+            [
+                subAssistant,
+                subEvaluator,
+                subQuestions
+            ].forEach(
+                function (sub) {
+                    if (sub) {
+                        sub.style.display =
+                            "none";
+                    }
+                }
+            );
 
-                } catch (error) {
+            if (activeTab) {
+                activeTab.classList.add(
+                    "active"
+                );
+            }
 
-                    showPopup(
-                        "Logout Failed",
-                        error.message ||
-                        "Unable to logout.",
-                        "error"
+            if (activeSub) {
+                activeSub.style.display =
+                    "block";
+            }
+        }
+
+        if (
+            tabAssistant &&
+            tabEvaluator &&
+            tabQuestions
+        ) {
+            tabAssistant.addEventListener(
+                "click",
+                function () {
+                    activateTab(
+                        tabAssistant,
+                        subAssistant
                     );
                 }
+            );
+
+            tabEvaluator.addEventListener(
+                "click",
+                function () {
+                    activateTab(
+                        tabEvaluator,
+                        subEvaluator
+                    );
+                }
+            );
+
+            tabQuestions.addEventListener(
+                "click",
+                function () {
+                    activateTab(
+                        tabQuestions,
+                        subQuestions
+                    );
+                }
+            );
+        }
+
+        /* ----------------------------------------------------
+           AI ASSISTANT
+           ---------------------------------------------------- */
+
+        const promptInput =
+            $("input-ai-prompt");
+
+        const submitButton =
+            $("btn-submit-ai-prompt");
+
+        const presetButtons =
+            qsa(".ai-preset-btn");
+
+        const responseCard =
+            $("ai-assistant-response-card");
+
+        const responseTitle =
+            $("ai-response-title");
+
+        const responseBody =
+            $("ai-response-body");
+
+        async function executePrompt(
+            query
+        ) {
+            if (!query) {
+                return;
+            }
+
+            if (responseCard) {
+                responseCard.style.display =
+                    "block";
+            }
+
+            if (responseTitle) {
+                responseTitle.textContent =
+                    "Generating response...";
+            }
+
+            if (responseBody) {
+                responseBody.innerHTML =
+                    `
+                        <p>
+                            Preparing an answer based on your
+                            current career and resume data...
+                        </p>
+                    `;
+            }
+
+            const formData =
+                new FormData();
+
+            formData.append(
+                "action",
+                "ask_interview_ai"
+            );
+
+            formData.append(
+                "prompt",
+                query
+            );
+
+            formData.append(
+                "target_role",
+                state.targetRole || ""
+            );
+
+            formData.append(
+                "target_company",
+                state.targetCompany || ""
+            );
+
+            try {
+                const result =
+                    await apiRequest(
+                        "ask_interview_ai",
+                        formData
+                    );
+
+                if (
+                    !apiSuccess(
+                        result
+                    )
+                ) {
+                    throw new Error(
+                        result.message ||
+                        "Unable to generate AI response."
+                    );
+                }
+
+                if (responseTitle) {
+                    responseTitle.textContent =
+                        result.title ||
+                        "Interview Guidance";
+                }
+
+                if (responseBody) {
+                    let html =
+                        "";
+
+                    if (
+                        Array.isArray(
+                            result.advice_steps
+                        )
+                    ) {
+                        html +=
+                            `
+                                <ul>
+                                    ${result.advice_steps
+                                        .map(
+                                            function (
+                                                step
+                                            ) {
+                                                return `
+                                                    <li>
+                                                        ${escapeHtml(
+                                                            step
+                                                        )}
+                                                    </li>
+                                                `;
+                                            }
+                                        )
+                                        .join("")}
+                                </ul>
+                            `;
+                    }
+
+                    if (
+                        result.sample_question
+                    ) {
+                        html +=
+                            `
+                                <h4>
+                                    Practice Question
+                                </h4>
+
+                                <p>
+                                    ${escapeHtml(
+                                        result.sample_question
+                                    )}
+                                </p>
+                            `;
+                    }
+
+                    if (
+                        result.sample_answer
+                    ) {
+                        html +=
+                            `
+                                <h4>
+                                    Model Answer Strategy
+                                </h4>
+
+                                <p>
+                                    ${escapeHtml(
+                                        result.sample_answer
+                                    )}
+                                </p>
+                            `;
+                    }
+
+                    responseBody.innerHTML =
+                        html ||
+                        "<p>No response content returned.</p>";
+                }
+
+            } catch (error) {
+                if (responseTitle) {
+                    responseTitle.textContent =
+                        "AI Assistant Error";
+                }
+
+                if (responseBody) {
+                    responseBody.innerHTML =
+                        `
+                            <p style="color:var(--rose);">
+                                ${escapeHtml(
+                                    error.message ||
+                                    "Unable to generate response."
+                                )}
+                            </p>
+                        `;
+                }
+            }
+        }
+
+        if (
+            submitButton &&
+            promptInput
+        ) {
+            submitButton.addEventListener(
+                "click",
+                function () {
+                    executePrompt(
+                        promptInput.value.trim()
+                    );
+                }
+            );
+
+            promptInput.addEventListener(
+                "keydown",
+                function (event) {
+                    if (
+                        event.key ===
+                        "Enter"
+                    ) {
+                        event.preventDefault();
+
+                        executePrompt(
+                            promptInput.value.trim()
+                        );
+                    }
+                }
+            );
+        }
+
+        presetButtons.forEach(
+            function (button) {
+                button.addEventListener(
+                    "click",
+                    function () {
+                        const query =
+                            button.getAttribute(
+                                "data-query"
+                            ) || "";
+
+                        if (
+                            promptInput
+                        ) {
+                            promptInput.value =
+                                query;
+                        }
+
+                        executePrompt(
+                            query
+                        );
+                    }
+                );
             }
         );
+
+        /* ----------------------------------------------------
+           ANSWER EVALUATOR
+           ---------------------------------------------------- */
+
+        const questionSelect =
+            $("select-eval-question");
+
+        const customQuestion =
+            $("input-eval-custom-q");
+
+        if (
+            questionSelect &&
+            customQuestion
+        ) {
+            questionSelect.addEventListener(
+                "change",
+                function () {
+                    customQuestion.style.display =
+                        questionSelect.value ===
+                        "custom"
+                            ? "block"
+                            : "none";
+                }
+            );
+        }
+
+        const evaluateButton =
+            $("btn-submit-eval-answer");
+
+        if (evaluateButton) {
+            evaluateButton.addEventListener(
+                "click",
+                async function () {
+                    let question =
+                        questionSelect
+                            ? questionSelect.value
+                            : "";
+
+                    if (
+                        question ===
+                        "custom"
+                    ) {
+                        question =
+                            customQuestion
+                                ?.value.trim() ||
+                            "";
+                    }
+
+                    const answer =
+                        $("input-eval-user-answer")
+                            ?.value.trim() ||
+                        "";
+
+                    if (!answer) {
+                        showPopup(
+                            "Answer Required",
+                            "Please type your answer before submitting it for evaluation.",
+                            "warning"
+                        );
+
+                        return;
+                    }
+
+                    const resultCard =
+                        $("ai-evaluator-result-card");
+
+                    if (resultCard) {
+                        resultCard.style.display =
+                            "block";
+                    }
+
+                    const scoreDisplay =
+                        $("eval-overall-score-display");
+
+                    if (scoreDisplay) {
+                        scoreDisplay.textContent =
+                            "Evaluating...";
+                    }
+
+                    const formData =
+                        new FormData();
+
+                    formData.append(
+                        "action",
+                        "evaluate_answer"
+                    );
+
+                    formData.append(
+                        "question",
+                        question
+                    );
+
+                    formData.append(
+                        "user_answer",
+                        answer
+                    );
+
+                    formData.append(
+                        "target_role",
+                        state.targetRole || ""
+                    );
+
+                    try {
+                        const result =
+                            await apiRequest(
+                                "evaluate_answer",
+                                formData
+                            );
+
+                        if (
+                            !apiSuccess(
+                                result
+                            )
+                        ) {
+                            throw new Error(
+                                result.message ||
+                                "Evaluation failed."
+                            );
+                        }
+
+                        if (scoreDisplay) {
+                            scoreDisplay.textContent =
+                                `Overall Score: ${
+                                    result.total_score || 0
+                                } / 100`;
+                        }
+
+                        const badge =
+                            $("eval-rating-badge");
+
+                        if (badge) {
+                            badge.textContent =
+                                result.rating ||
+                                "Evaluated";
+
+                            if (
+                                result.color
+                            ) {
+                                badge.style.background =
+                                    result.color;
+                            }
+                        }
+
+                        const breakdown =
+                            result.breakdown ||
+                            {};
+
+                        const mapping = {
+                            "eval-score-tech":
+                                breakdown.technical_accuracy,
+
+                            "eval-score-kw":
+                                breakdown.keywords_terminology,
+
+                            "eval-score-struct":
+                                breakdown.structure_clarity,
+
+                            "eval-score-rel":
+                                breakdown.real_world_relevance,
+
+                            "eval-score-comp":
+                                breakdown.completeness
+                        };
+
+                        Object.keys(
+                            mapping
+                        ).forEach(
+                            function (id) {
+                                const element =
+                                    $(id);
+
+                                if (element) {
+                                    element.textContent =
+                                        `${mapping[id] || 0} / 20`;
+                                }
+                            }
+                        );
+
+                        const strengths =
+                            $("eval-strengths-list");
+
+                        if (strengths) {
+                            strengths.innerHTML =
+                                (
+                                    result.strengths ||
+                                    []
+                                )
+                                    .map(
+                                        function (
+                                            item
+                                        ) {
+                                            return `
+                                                <li>
+                                                    ${escapeHtml(
+                                                        item
+                                                    )}
+                                                </li>
+                                            `;
+                                        }
+                                    )
+                                    .join("");
+                        }
+
+                        const missing =
+                            $("eval-missing-list");
+
+                        if (missing) {
+                            missing.innerHTML =
+                                (
+                                    result.missing_points ||
+                                    []
+                                )
+                                    .map(
+                                        function (
+                                            item
+                                        ) {
+                                            return `
+                                                <li>
+                                                    ${escapeHtml(
+                                                        item
+                                                    )}
+                                                </li>
+                                            `;
+                                        }
+                                    )
+                                    .join("");
+                        }
+
+                        const ideal =
+                            $("eval-ideal-answer");
+
+                        if (ideal) {
+                            ideal.textContent =
+                                result.ideal_answer ||
+                                "";
+                        }
+
+                    } catch (error) {
+                        if (scoreDisplay) {
+                            scoreDisplay.textContent =
+                                "Evaluation Failed";
+                        }
+
+                        showPopup(
+                            "Evaluation Failed",
+                            error.message ||
+                            "Unable to evaluate the answer.",
+                            "error"
+                        );
+                    }
+                }
+            );
+        }
     }
 
 
@@ -4995,31 +4364,247 @@ document.addEventListener("DOMContentLoaded", function () {
        REPORT
        ======================================================== */
 
-    function initReport() {
+    function updateReport() {
+        const url =
+            state.careerUrl;
 
+        const elements =
+            [
+                $("report-career-url"),
+                $("report-url")
+            ].filter(Boolean);
+
+        elements.forEach(
+            function (element) {
+                element.textContent =
+                    url || "Not analyzed";
+            }
+        );
+
+        const jobs =
+            $("report-job-count");
+
+        if (jobs) {
+            jobs.textContent =
+                state.careerJobs.length;
+        }
+
+        const skills =
+            $("report-skill-count");
+
+        if (skills) {
+            skills.textContent =
+                state.extractedSkills.length;
+        }
+
+        const ats =
+            $("report-ats-score");
+
+        if (ats) {
+            ats.textContent =
+                Math.round(
+                    state.atsScore
+                );
+        }
+    }
+
+
+    /* ========================================================
+       PDF REPORT
+       ======================================================== */
+
+    function initReportDownload() {
         const form =
-            $("report-form");
-
+            $("form-report-download");
 
         if (!form) {
             return;
         }
 
-
         form.addEventListener(
             "submit",
-            function () {
+            function (event) {
+                /*
+                 * Allow normal POST submission if the backend
+                 * expects a downloadable PDF response.
+                 */
+                const action =
+                    form.getAttribute(
+                        "action"
+                    ) || "";
 
-                const input =
-                    $("report-career-url");
-
-
-                if (input) {
-
-                    input.value =
-                        state.careerUrl ||
-                        "";
+                if (
+                    action.includes(
+                        "download_pdf"
+                    )
+                ) {
+                    return;
                 }
+
+                event.preventDefault();
+
+                const formData =
+                    new FormData(form);
+
+                formData.set(
+                    "action",
+                    "download_pdf"
+                );
+
+                apiRequest(
+                    "download_pdf",
+                    formData
+                ).catch(
+                    function (error) {
+                        showPopup(
+                            "Report Generation Failed",
+                            error.message ||
+                            "Unable to generate report.",
+                            "error"
+                        );
+                    }
+                );
+            }
+        );
+    }
+
+
+    /* ========================================================
+       GLOBAL DATA SYNCHRONIZATION
+       ======================================================== */
+
+    function updateGlobalData() {
+        window.EXTRACTED_SKILLS =
+            state.extractedSkills;
+
+        window.REQUIRED_SKILLS =
+            state.requiredSkills;
+
+        window.ATS_SCORE =
+            state.atsScore;
+
+        window.CAREER_URL =
+            state.careerUrl;
+
+        window.CAREER_JOBS =
+            state.careerJobs;
+
+        /*
+         * DO NOT create fake company/role defaults.
+         *
+         * These values come only from actual analyzed data.
+         */
+        window.TARGET_COMPANY =
+            state.targetCompany || "";
+
+        window.TARGET_ROLE =
+            state.targetRole || "";
+    }
+
+
+    /* ========================================================
+       INITIALIZE EXISTING APP DATA
+       ======================================================== */
+
+    function initializeState() {
+        updateGlobalData();
+
+        renderJobs();
+        renderExtractedSkills();
+        renderATS();
+        renderSkillGap();
+        updateRecommendation();
+        updateStats();
+        updateReport();
+
+        const careerInput =
+            $("input-scrape-url");
+
+        if (
+            careerInput &&
+            state.careerUrl
+        ) {
+            careerInput.value =
+                state.careerUrl;
+        }
+
+        const banner =
+            $("banner-company-role");
+
+        if (banner) {
+            if (
+                state.targetCompany ||
+                state.targetRole
+            ) {
+                banner.textContent =
+                    [
+                        state.targetCompany,
+                        state.targetRole
+                    ]
+                        .filter(Boolean)
+                        .join(" · ");
+            } else {
+                banner.textContent =
+                    "Dynamic Career Analysis";
+            }
+        }
+    }
+
+
+    /* ========================================================
+       REMOVE OLD COMPANY / ROLE SELECTOR
+       ======================================================== */
+
+    function disableLegacyCompanySelector() {
+        /*
+         * The previous version contained:
+         *
+         * Google
+         * Software Development Engineer
+         * Zoho
+         * Backend Engineer
+         *
+         * Those values must NOT be used.
+         *
+         * If old selector HTML is still present,
+         * hide it rather than allowing it to overwrite
+         * the dynamically scraped career information.
+         */
+
+        const oldSelector =
+            $("box-benchmark-select");
+
+        const oldMode =
+            $("mode-benchmark");
+
+        const oldCustom =
+            $("box-custom-select");
+
+        if (oldSelector) {
+            oldSelector.style.display =
+                "none";
+        }
+
+        if (oldCustom) {
+            oldCustom.style.display =
+                "none";
+        }
+
+        if (oldMode) {
+            oldMode.checked =
+                false;
+        }
+
+        /*
+         * Remove old selector event handlers by disabling
+         * the controls.
+         */
+        qsa(
+            "#select-company, #select-role, #input-custom-company, #input-custom-role"
+        ).forEach(
+            function (element) {
+                element.disabled =
+                    true;
             }
         );
     }
@@ -5029,274 +4614,110 @@ document.addEventListener("DOMContentLoaded", function () {
        FAVICON
        ======================================================== */
 
-    function initializeFavicon() {
-
+    function ensureFavicon() {
         const existing =
             document.querySelector(
                 'link[rel="icon"]'
             );
 
-
         if (existing) {
             return;
         }
 
-
-        const canvas =
-            document.createElement(
-                "canvas"
-            );
-
-
-        canvas.width =
-            64;
-
-        canvas.height =
-            64;
-
-
-        const context =
-            canvas.getContext(
-                "2d"
-            );
-
-
-        if (!context) {
-            return;
-        }
-
-
-        context.fillStyle =
-            "#2563eb";
-
-        context.fillRect(
-            0,
-            0,
-            64,
-            64
-        );
-
-
-        context.fillStyle =
-            "#ffffff";
-
-        context.font =
-            "bold 30px Arial";
-
-        context.textAlign =
-            "center";
-
-        context.textBaseline =
-            "middle";
-
-
-        context.fillText(
-            "SG",
-            32,
-            34
-        );
-
-
-        const link =
+        const favicon =
             document.createElement(
                 "link"
             );
 
-
-        link.rel =
+        favicon.rel =
             "icon";
 
-        link.href =
-            canvas.toDataURL(
-                "image/png"
+        favicon.href =
+            "data:image/svg+xml," +
+            encodeURIComponent(
+                `
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         viewBox="0 0 100 100">
+                        <circle
+                            cx="50"
+                            cy="50"
+                            r="45"
+                            fill="#06b6d4"/>
+                        <text
+                            x="50"
+                            y="63"
+                            text-anchor="middle"
+                            font-size="42"
+                            fill="white">
+                            S
+                        </text>
+                    </svg>
+                `
             );
-
 
         document.head.appendChild(
-            link
+            favicon
         );
     }
 
 
     /* ========================================================
-       INITIAL TARGET DATA
+       START APPLICATION
        ======================================================== */
 
-    function initializeTarget() {
-
-        state.careerUrl =
-            window.APP_DATA?.careerUrl ||
-            "";
-
-
-        state.targetCompany =
-            window.APP_DATA?.targetCompany ||
-            "";
-
-
-        state.targetRole =
-            window.APP_DATA?.targetRole ||
-            "";
-
-
-        state.requiredSkills =
-            normalizeSkills(
-                window.APP_DATA?.requiredSkills ||
-                []
-            );
-
-
-        state.extractedSkills =
-            normalizeSkills(
-                window.APP_DATA?.extractedSkills ||
-                []
-            );
-
-
-        state.careerJobs =
-            normalizeJobs(
-                window.APP_DATA?.careerJobs ||
-                []
-            );
-
-
-        state.atsScore =
-            Number(
-                window.APP_DATA?.atsScore ||
-                0
-            );
-
-
-        state.recommendedJob =
-            window.APP_DATA?.recommendedJob ||
-            null;
-
-
-        updateCareerInputs(
-            state.careerUrl
-        );
-    }
-
-
-    /* ========================================================
-       AUTH SCREEN / APP SHELL
-       ======================================================== */
-
-    function initializeAuthVisibility() {
-
-        const authScreen =
-            $("auth-screen");
-
-        const appShell =
-            $("app-shell");
-
-
-        if (state.loggedIn) {
-
-            if (authScreen) {
-
-                authScreen.style.display =
-                    "none";
-            }
-
-
-            if (appShell) {
-
-                appShell.style.display =
-                    "";
-            }
-
-        } else {
-
-            if (authScreen) {
-
-                authScreen.style.display =
-                    "";
-            }
-
-
-            if (appShell) {
-
-                appShell.style.display =
-                    "none";
-            }
-        }
-    }
-
-
-    /* ========================================================
-       INITIALIZATION
-       ======================================================== */
-
-    function initializeApplication() {
-
-        initializeAuthVisibility();
-
-        initAuthTabs();
-
-        initLogin();
-
-        initSignup();
-
-        initPasswordToggles();
+    try {
+        ensurePopup();
+        ensureFavicon();
 
         initTheme();
-
         initSidebar();
+        initAuth();
 
-        initNavigation();
-
-        initCareerScraper();
-
-        initResumeUpload();
-
-        initJobRanking();
-
-        initInterview();
-
-        initAIAssistant();
-
-        initProfileForm();
-
-        initLogout();
-
-        initReport();
-
-        initializeTarget();
-
-        renderATS();
-
-        renderExtractedSkills();
-
-        renderSkillGap();
-
-        renderJobs();
-
-        updateRecommendation();
-
-        updateStats();
-
-        initCharts();
-
-        renderDashboardCharts();
-
-
+        /*
+         * Only initialize dashboard features when
+         * the authenticated application exists.
+         */
         if (state.loggedIn) {
+            initNavigation();
+            initCharts();
+            initSkillEditor();
+            initResumeUpload();
+            initJobRanking();
+            initWebScraper();
+            initProfileForm();
+            initAIInterviewAssistant();
+            initReportDownload();
 
-            loadMetrics();
+            disableLegacyCompanySelector();
+            initializeState();
 
-            navigateToView(
-                "dashboard"
-            );
+            /*
+             * Load dynamic data only when available.
+             */
+            if (
+                state.careerUrl &&
+                state.careerJobs.length === 0
+            ) {
+                /*
+                 * Do not automatically scrape again here.
+                 * The user can explicitly analyze the URL.
+                 */
+            }
+
+            loadDynamicRoadmap();
+            loadDynamicInterview();
         }
 
-
-        initializeFavicon();
-
-        initializeLoader();
+    } catch (error) {
+        console.error(
+            "Application initialization error:",
+            error
+        );
+    } finally {
+        /*
+         * NEVER allow the loading overlay to remain
+         * permanently visible because of a JS exception.
+         */
+        hidePageLoader();
     }
-
-
-    initializeApplication();
-
 });
