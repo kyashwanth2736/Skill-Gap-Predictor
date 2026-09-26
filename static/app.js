@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", function () {
         user: window.APP_DATA?.user || null,
 
         careerUrl: window.APP_DATA?.careerUrl || "",
+
         careerJobs: Array.isArray(window.APP_DATA?.careerJobs)
             ? window.APP_DATA.careerJobs
             : [],
@@ -37,7 +38,9 @@ document.addEventListener("DOMContentLoaded", function () {
             window.APP_DATA?.recommendedJob || null,
 
         currentView: "dashboard",
+
         selectedResume: null,
+
         charts: {}
     };
 
@@ -62,13 +65,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
     function escapeHtml(value) {
-        const div = document.createElement("div");
-        div.textContent = value == null ? "" : String(value);
+
+        const div =
+            document.createElement("div");
+
+        div.textContent =
+            value == null ? "" : String(value);
+
         return div.innerHTML;
     }
 
 
     function normalizeSkill(skill) {
+
         return String(skill || "")
             .trim()
             .toLowerCase()
@@ -78,6 +87,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
     function normalizeSkills(skills) {
+
         if (!Array.isArray(skills)) {
             return [];
         }
@@ -91,16 +101,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            const value = String(skill).trim();
+            const value =
+                String(skill).trim();
 
             if (!value) {
                 return;
             }
 
-            const normalized = normalizeSkill(value);
+            const normalized =
+                normalizeSkill(value);
 
             if (!seen.has(normalized)) {
+
                 seen.add(normalized);
+
                 result.push(value);
             }
         });
@@ -109,15 +123,24 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    function showMessage(element, message, type = "info") {
+    function showMessage(
+        element,
+        message,
+        type = "info"
+    ) {
 
         if (!element) {
             return;
         }
 
-        element.textContent = message;
-        element.className = "auth-message " + type;
-        element.style.display = "block";
+        element.textContent =
+            message;
+
+        element.className =
+            "auth-message " + type;
+
+        element.style.display =
+            "block";
     }
 
 
@@ -127,12 +150,19 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        element.textContent = "";
-        element.style.display = "none";
+        element.textContent =
+            "";
+
+        element.style.display =
+            "none";
     }
 
 
-    function setLoading(button, loading, loadingText = "Loading...") {
+    function setLoading(
+        button,
+        loading,
+        loadingText = "Loading..."
+    ) {
 
         if (!button) {
             return;
@@ -141,20 +171,32 @@ document.addEventListener("DOMContentLoaded", function () {
         if (loading) {
 
             if (!button.dataset.originalText) {
+
                 button.dataset.originalText =
                     button.textContent.trim();
             }
 
-            button.disabled = true;
-            button.classList.add("loading");
-            button.textContent = loadingText;
+            button.disabled =
+                true;
+
+            button.classList.add(
+                "loading"
+            );
+
+            button.textContent =
+                loadingText;
 
         } else {
 
-            button.disabled = false;
-            button.classList.remove("loading");
+            button.disabled =
+                false;
+
+            button.classList.remove(
+                "loading"
+            );
 
             if (button.dataset.originalText) {
+
                 button.textContent =
                     button.dataset.originalText;
             }
@@ -172,9 +214,11 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        const style = document.createElement("style");
+        const style =
+            document.createElement("style");
 
-        style.id = "sgp-popup-styles";
+        style.id =
+            "sgp-popup-styles";
 
         style.textContent = `
             .sgp-popup-overlay {
@@ -262,8 +306,13 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             @keyframes sgpFadeIn {
-                from { opacity: 0; }
-                to { opacity: 1; }
+                from {
+                    opacity: 0;
+                }
+
+                to {
+                    opacity: 1;
+                }
             }
 
             @keyframes sgpPopupIn {
@@ -271,6 +320,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     opacity: 0;
                     transform: translateY(12px) scale(.97);
                 }
+
                 to {
                     opacity: 1;
                     transform: translateY(0) scale(1);
@@ -292,24 +342,30 @@ document.addEventListener("DOMContentLoaded", function () {
 
         ensurePopupStyles();
 
-        const existing = $("sgp-popup-overlay");
+        const existing =
+            $("sgp-popup-overlay");
 
         if (existing) {
             existing.remove();
         }
 
-        const overlay = document.createElement("div");
+        const overlay =
+            document.createElement("div");
 
-        overlay.id = "sgp-popup-overlay";
-        overlay.className = "sgp-popup-overlay";
+        overlay.id =
+            "sgp-popup-overlay";
+
+        overlay.className =
+            "sgp-popup-overlay";
 
         let icon = "i";
 
         if (type === "success") {
             icon = "✓";
-        } else if (type === "error") {
-            icon = "!";
-        } else if (type === "warning") {
+        } else if (
+            type === "error" ||
+            type === "warning"
+        ) {
             icon = "!";
         }
 
@@ -339,44 +395,60 @@ document.addEventListener("DOMContentLoaded", function () {
             </div>
         `;
 
-        document.body.appendChild(overlay);
+        document.body.appendChild(
+            overlay
+        );
 
-        const closePopup = function () {
 
-            overlay.remove();
+        const closePopup =
+            function () {
 
-            if (typeof callback === "function") {
-                callback();
-            }
-        };
+                overlay.remove();
 
-        const ok = $("sgp-popup-ok");
+                if (
+                    typeof callback ===
+                    "function"
+                ) {
+                    callback();
+                }
+            };
+
+
+        const ok =
+            $("sgp-popup-ok");
 
         if (ok) {
-            ok.addEventListener("click", closePopup);
+
+            ok.addEventListener(
+                "click",
+                closePopup
+            );
         }
 
-        overlay.addEventListener("click", function (event) {
 
-            if (event.target === overlay) {
-                closePopup();
+        overlay.addEventListener(
+            "click",
+            function (event) {
+
+                if (
+                    event.target === overlay
+                ) {
+                    closePopup();
+                }
             }
-
-        });
+        );
     }
 
 
-    /*
-     * Replace browser alert with application popup.
-     */
-    window.alert = function (message) {
+    window.alert =
+        function (message) {
 
-        showPopup(
-            "Skill-Gap Predictor",
-            String(message || ""),
-            "info"
-        );
-    };
+            showPopup(
+                "Skill-Gap Predictor",
+                String(message || ""),
+                "info"
+            );
+        };
 
 
     /* ========================================================
@@ -390,47 +462,70 @@ document.addEventListener("DOMContentLoaded", function () {
     ) {
 
         const method =
-            options.method ||
-            "POST";
+            options.method || "POST";
 
         let url =
             "api.php?action=" +
             encodeURIComponent(action);
 
         const fetchOptions = {
+
             method: method,
-            credentials: "same-origin",
+
+            credentials:
+                "same-origin",
+
+            cache:
+                "no-store",
+
             headers: {}
         };
 
 
-        if (method.toUpperCase() === "GET") {
+        if (
+            method.toUpperCase() ===
+            "GET"
+        ) {
 
             const params =
                 new URLSearchParams(data);
 
-            url += "&" + params.toString();
+            const query =
+                params.toString();
+
+            if (query) {
+                url += "&" + query;
+            }
 
         } else {
 
-            if (data instanceof FormData) {
+            if (
+                data instanceof FormData
+            ) {
 
-                fetchOptions.body = data;
+                fetchOptions.body =
+                    data;
 
             } else {
 
                 fetchOptions.headers[
                     "Content-Type"
-                ] = "application/x-www-form-urlencoded;charset=UTF-8";
+                ] =
+                    "application/x-www-form-urlencoded;charset=UTF-8";
 
                 fetchOptions.body =
-                    new URLSearchParams(data).toString();
+                    new URLSearchParams(
+                        data
+                    ).toString();
             }
         }
 
 
         const response =
-            await fetch(url, fetchOptions);
+            await fetch(
+                url,
+                fetchOptions
+            );
 
 
         const text =
@@ -439,12 +534,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
         let result;
 
+
         try {
 
             result =
                 JSON.parse(text);
 
         } catch (error) {
+
+            console.error(
+                "Invalid API response:",
+                text
+            );
 
             throw new Error(
                 "Invalid server response."
@@ -472,15 +573,44 @@ document.addEventListener("DOMContentLoaded", function () {
             return false;
         }
 
-        if (
+        return (
             result.success === true ||
             result.status === "success" ||
             result.ok === true
-        ) {
-            return true;
-        }
+        );
+    }
 
-        return false;
+
+    /* ========================================================
+       AUTHENTICATED DASHBOARD REDIRECT
+       ======================================================== */
+
+    function redirectToDashboard() {
+
+        /*
+         * The PHP session is created by api.php.
+         * Reloading index.php makes PHP read that session
+         * and render the authenticated dashboard.
+         */
+
+        try {
+
+            const currentUrl =
+                new URL(
+                    window.location.href
+                );
+
+            currentUrl.search = "";
+            currentUrl.hash = "";
+
+            window.location.replace(
+                currentUrl.href
+            );
+
+        } catch (error) {
+
+            window.location.reload();
+        }
     }
 
 
@@ -490,33 +620,49 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function hideLoader() {
 
-        const loader = $("page-loader");
+        const loader =
+            $("page-loader");
 
         if (!loader) {
             return;
         }
 
-        loader.classList.add("hidden");
+        loader.classList.add(
+            "hidden"
+        );
 
-        loader.style.opacity = "0";
-        loader.style.visibility = "hidden";
-        loader.style.pointerEvents = "none";
+        loader.style.opacity =
+            "0";
 
-        setTimeout(function () {
+        loader.style.visibility =
+            "hidden";
 
-            if (loader) {
-                loader.style.display = "none";
-            }
+        loader.style.pointerEvents =
+            "none";
 
-        }, 500);
+
+        window.setTimeout(
+            function () {
+
+                if (loader) {
+
+                    loader.style.display =
+                        "none";
+                }
+
+            },
+            500
+        );
     }
 
 
     function initializeLoader() {
 
+        hideLoader();
+
         window.setTimeout(
             hideLoader,
-            500
+            800
         );
 
         window.setTimeout(
@@ -540,58 +686,83 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
 
-        buttons.forEach(function (button) {
+        buttons.forEach(
+            function (button) {
 
-            button.addEventListener(
-                "click",
-                function () {
+                button.addEventListener(
+                    "click",
+                    function () {
 
-                    const tab =
-                        button.dataset.authTab;
-
-                    buttons.forEach(function (item) {
-                        item.classList.remove("active");
-                    });
-
-                    button.classList.add("active");
+                        const tab =
+                            button.dataset.authTab;
 
 
-                    const loginPanel =
-                        $("form-login-box");
+                        buttons.forEach(
+                            function (item) {
 
-                    const signupPanel =
-                        $("form-signup-box");
+                                item.classList.remove(
+                                    "active"
+                                );
+                            }
+                        );
 
 
-                    if (tab === "signup") {
+                        button.classList.add(
+                            "active"
+                        );
 
-                        if (loginPanel) {
-                            loginPanel.classList.remove("active");
-                        }
 
-                        if (signupPanel) {
-                            signupPanel.classList.add("active");
-                        }
+                        const loginPanel =
+                            $("form-login-box");
 
-                    } else {
+                        const signupPanel =
+                            $("form-signup-box");
 
-                        if (signupPanel) {
-                            signupPanel.classList.remove("active");
-                        }
 
-                        if (loginPanel) {
-                            loginPanel.classList.add("active");
+                        if (
+                            tab === "signup"
+                        ) {
+
+                            if (loginPanel) {
+
+                                loginPanel.classList.remove(
+                                    "active"
+                                );
+                            }
+
+                            if (signupPanel) {
+
+                                signupPanel.classList.add(
+                                    "active"
+                                );
+                            }
+
+                        } else {
+
+                            if (signupPanel) {
+
+                                signupPanel.classList.remove(
+                                    "active"
+                                );
+                            }
+
+                            if (loginPanel) {
+
+                                loginPanel.classList.add(
+                                    "active"
+                                );
+                            }
                         }
                     }
-
-                }
-            );
-
-        });
+                );
+            }
+        );
     }
 
 
-    function openLoginTab(email = "") {
+    function openLoginTab(
+        email = ""
+    ) {
 
         const loginButton =
             $("tab-btn-login");
@@ -607,29 +778,57 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         if (loginButton) {
-            loginButton.classList.add("active");
+
+            loginButton.classList.add(
+                "active"
+            );
         }
+
 
         if (signupButton) {
-            signupButton.classList.remove("active");
+
+            signupButton.classList.remove(
+                "active"
+            );
         }
+
 
         if (loginPanel) {
-            loginPanel.classList.add("active");
+
+            loginPanel.classList.add(
+                "active"
+            );
         }
+
 
         if (signupPanel) {
-            signupPanel.classList.remove("active");
+
+            signupPanel.classList.remove(
+                "active"
+            );
         }
 
 
-        if (email && $("login_email")) {
-            $("login_email").value = email;
+        if (
+            email &&
+            $("login_email")
+        ) {
+
+            $("login_email").value =
+                email;
         }
 
 
         if ($("login_password")) {
-            $("login_password").focus();
+
+            setTimeout(
+                function () {
+
+                    $("login_password").focus();
+
+                },
+                100
+            );
         }
     }
 
@@ -656,10 +855,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
                 const email =
-                    $("login_email")?.value.trim() || "";
+                    $("login_email")?.value.trim() ||
+                    "";
 
                 const password =
-                    $("login_password")?.value || "";
+                    $("login_password")?.value ||
+                    "";
 
 
                 const errorBox =
@@ -668,15 +869,33 @@ document.addEventListener("DOMContentLoaded", function () {
                 const successBox =
                     $("login-success-msg");
 
-                hideMessage(errorBox);
-                hideMessage(successBox);
+
+                hideMessage(
+                    errorBox
+                );
+
+                hideMessage(
+                    successBox
+                );
 
 
-                if (!email || !password) {
+                if (!email) {
 
                     showMessage(
                         errorBox,
-                        "Please enter your email and password.",
+                        "Please enter your email address.",
+                        "error"
+                    );
+
+                    return;
+                }
+
+
+                if (!password) {
+
+                    showMessage(
+                        errorBox,
+                        "Please enter your password.",
                         "error"
                     );
 
@@ -686,6 +905,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 const button =
                     $("btn-do-login");
+
 
                 setLoading(
                     button,
@@ -700,13 +920,24 @@ document.addEventListener("DOMContentLoaded", function () {
                         await apiRequest(
                             "login",
                             {
-                                email: email,
-                                password: password
+                                email:
+                                    email,
+
+                                password:
+                                    password
                             }
                         );
 
 
-                    if (!apiSuccess(result)) {
+                    console.log(
+                        "Login response:",
+                        result
+                    );
+
+
+                    if (
+                        !apiSuccess(result)
+                    ) {
 
                         throw new Error(
                             result.message ||
@@ -716,22 +947,53 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
 
 
+                    /*
+                     * Update local state immediately.
+                     */
+
+                    state.loggedIn =
+                        true;
+
+                    state.user =
+                        result.user ||
+                        null;
+
+
+                    /*
+                     * Show success message briefly.
+                     */
+
                     showMessage(
                         successBox,
-                        "Login successful. Loading your dashboard...",
+                        "Login successful. Redirecting to dashboard...",
                         "success"
                     );
 
 
+                    /*
+                     * Important:
+                     * The PHP session exists on the server now.
+                     * Reload the page so index.php renders the
+                     * authenticated dashboard instead of the auth screen.
+                     */
+
                     window.setTimeout(
                         function () {
-                            window.location.reload();
+
+                            redirectToDashboard();
+
                         },
-                        500
+                        350
                     );
 
 
                 } catch (error) {
+
+                    console.error(
+                        "Login error:",
+                        error
+                    );
+
 
                     showMessage(
                         errorBox,
@@ -740,6 +1002,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         "error"
                     );
 
+
                 } finally {
 
                     setLoading(
@@ -747,7 +1010,6 @@ document.addEventListener("DOMContentLoaded", function () {
                         false
                     );
                 }
-
             }
         );
     }
@@ -775,34 +1037,44 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
                 const name =
-                    $("signup_name")?.value.trim() || "";
+                    $("signup_name")?.value.trim() ||
+                    "";
 
                 const email =
-                    $("signup_email")?.value.trim() || "";
+                    $("signup_email")?.value.trim() ||
+                    "";
 
                 const password =
-                    $("signup_pwd")?.value || "";
+                    $("signup_pwd")?.value ||
+                    "";
 
                 const university =
-                    $("signup_uni")?.value.trim() || "";
+                    $("signup_uni")?.value.trim() ||
+                    "";
 
                 const branch =
-                    $("signup_branch")?.value.trim() || "";
+                    $("signup_branch")?.value.trim() ||
+                    "";
 
                 const major =
-                    $("signup_major")?.value.trim() || "";
+                    $("signup_major")?.value.trim() ||
+                    "";
 
                 const gradyear =
-                    $("signup_gradyear")?.value.trim() || "";
+                    $("signup_gradyear")?.value.trim() ||
+                    "";
 
                 const linkedin =
-                    $("signup_linkedin")?.value.trim() || "";
+                    $("signup_linkedin")?.value.trim() ||
+                    "";
 
                 const github =
-                    $("signup_github")?.value.trim() || "";
+                    $("signup_github")?.value.trim() ||
+                    "";
 
                 const terms =
-                    $("signup-terms")?.checked || false;
+                    $("signup-terms")?.checked ||
+                    false;
 
 
                 const errorBox =
@@ -812,8 +1084,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     $("signup-success-msg");
 
 
-                hideMessage(errorBox);
-                hideMessage(successBox);
+                hideMessage(
+                    errorBox
+                );
+
+                hideMessage(
+                    successBox
+                );
 
 
                 if (!name) {
@@ -879,6 +1156,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const button =
                     $("btn-do-signup");
 
+
                 setLoading(
                     button,
                     true,
@@ -892,21 +1170,45 @@ document.addEventListener("DOMContentLoaded", function () {
                         await apiRequest(
                             "register",
                             {
-                                name: name,
-                                email: email,
-                                password: password,
-                                university: university,
-                                branch: branch,
-                                major: major,
-                                gradyear: gradyear,
-                                linkedin: linkedin,
-                                github: github
+                                name:
+                                    name,
+
+                                email:
+                                    email,
+
+                                password:
+                                    password,
+
+                                university:
+                                    university,
+
+                                branch:
+                                    branch,
+
+                                major:
+                                    major,
+
+                                gradyear:
+                                    gradyear,
+
+                                linkedin:
+                                    linkedin,
+
+                                github:
+                                    github
                             }
                         );
 
 
+                    console.log(
+                        "Registration response:",
+                        result
+                    );
+
+
                     const resultCode =
                         String(
+                            result.error_code ||
                             result.code ||
                             result.status_code ||
                             ""
@@ -922,9 +1224,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
                     const duplicate =
-                        resultCode === "ACCOUNT_EXISTS" ||
-                        resultCode === "EMAIL_EXISTS" ||
-                        resultCode === "DUPLICATE" ||
+                        resultCode ===
+                            "ACCOUNT_EXISTS" ||
+
+                        resultCode ===
+                            "EMAIL_EXISTS" ||
+
+                        resultCode ===
+                            "DUPLICATE" ||
+
+                        result.accountExists ===
+                            true ||
+
                         /already|exist|duplicate|taken|registered/i
                             .test(message);
 
@@ -938,8 +1249,9 @@ document.addEventListener("DOMContentLoaded", function () {
                             "Go to Login",
                             function () {
 
-                                openLoginTab(email);
-
+                                openLoginTab(
+                                    email
+                                );
                             }
                         );
 
@@ -963,6 +1275,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     );
 
 
+                    form.reset();
+
+
                     showPopup(
                         "Account Registered Successfully",
                         "Your account has been created successfully. Please login to continue.",
@@ -970,16 +1285,20 @@ document.addEventListener("DOMContentLoaded", function () {
                         "Go to Login",
                         function () {
 
-                            openLoginTab(email);
-
+                            openLoginTab(
+                                email
+                            );
                         }
                     );
 
 
-                    form.reset();
-
-
                 } catch (error) {
+
+                    console.error(
+                        "Registration error:",
+                        error
+                    );
+
 
                     showMessage(
                         errorBox,
@@ -988,6 +1307,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         "error"
                     );
 
+
                 } finally {
 
                     setLoading(
@@ -995,7 +1315,6 @@ document.addEventListener("DOMContentLoaded", function () {
                         false
                     );
                 }
-
             }
         );
     }
@@ -1009,38 +1328,48 @@ document.addEventListener("DOMContentLoaded", function () {
 
         qsa(
             "[data-password-target]"
-        ).forEach(function (button) {
+        ).forEach(
+            function (button) {
 
-            button.addEventListener(
-                "click",
-                function () {
+                button.addEventListener(
+                    "click",
+                    function () {
 
-                    const targetId =
-                        button.dataset.passwordTarget;
+                        const targetId =
+                            button.dataset.passwordTarget;
 
-                    const input =
-                        $(targetId);
+                        const input =
+                            $(targetId);
 
-                    if (!input) {
-                        return;
+
+                        if (!input) {
+                            return;
+                        }
+
+
+                        if (
+                            input.type ===
+                            "password"
+                        ) {
+
+                            input.type =
+                                "text";
+
+                            button.textContent =
+                                "Hide";
+
+                        } else {
+
+                            input.type =
+                                "password";
+
+                            button.textContent =
+                                "Show";
+                        }
                     }
-
-
-                    if (input.type === "password") {
-
-                        input.type = "text";
-                        button.textContent = "Hide";
-
-                    } else {
-
-                        input.type = "password";
-                        button.textContent = "Show";
-                    }
-
-                }
-            );
-
-        });
+                );
+            }
+        );
     }
 
 
@@ -1071,6 +1400,10 @@ document.addEventListener("DOMContentLoaded", function () {
             dark
         );
 
+        /*
+         * Your styles.css uses dark-mode.
+         */
+
         body.classList.toggle(
             "dark-mode",
             dark
@@ -1079,21 +1412,31 @@ document.addEventListener("DOMContentLoaded", function () {
 
         localStorage.setItem(
             "sgp-theme",
-            dark ? "dark" : "light"
+            dark
+                ? "dark"
+                : "light"
         );
 
 
-        updateThemeButtons(dark);
+        updateThemeButtons(
+            dark
+        );
     }
 
 
-    function updateThemeButtons(isDark) {
+    function updateThemeButtons(
+        isDark
+    ) {
 
         const icon =
-            isDark ? "☀" : "☾";
+            isDark
+                ? "☀"
+                : "☾";
 
         const text =
-            isDark ? "Light Mode" : "Dark Mode";
+            isDark
+                ? "Light Mode"
+                : "Dark Mode";
 
 
         const themeIcon =
@@ -1107,15 +1450,23 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         if (themeIcon) {
-            themeIcon.textContent = icon;
+
+            themeIcon.textContent =
+                icon;
         }
+
 
         if (themeText) {
-            themeText.textContent = text;
+
+            themeText.textContent =
+                text;
         }
 
+
         if (topTheme) {
-            topTheme.textContent = icon;
+
+            topTheme.textContent =
+                icon;
         }
     }
 
@@ -1123,16 +1474,28 @@ document.addEventListener("DOMContentLoaded", function () {
     function initTheme() {
 
         const savedTheme =
-            localStorage.getItem("sgp-theme");
+            localStorage.getItem(
+                "sgp-theme"
+            );
 
 
-        if (savedTheme === "dark") {
+        if (
+            savedTheme ===
+            "dark"
+        ) {
 
-            applyTheme("dark");
+            applyTheme(
+                "dark"
+            );
 
-        } else if (savedTheme === "light") {
+        } else if (
+            savedTheme ===
+            "light"
+        ) {
 
-            applyTheme("light");
+            applyTheme(
+                "light"
+            );
 
         } else {
 
@@ -1142,8 +1505,11 @@ document.addEventListener("DOMContentLoaded", function () {
                     "(prefers-color-scheme: dark)"
                 ).matches;
 
+
             applyTheme(
-                prefersDark ? "dark" : "light"
+                prefersDark
+                    ? "dark"
+                    : "light"
             );
         }
 
@@ -1162,13 +1528,17 @@ document.addEventListener("DOMContentLoaded", function () {
                     "dark-mode"
                 );
 
+
             applyTheme(
-                isDark ? "light" : "dark"
+                isDark
+                    ? "light"
+                    : "dark"
             );
         }
 
 
         if (sidebarButton) {
+
             sidebarButton.addEventListener(
                 "click",
                 toggle
@@ -1177,6 +1547,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         if (topButton) {
+
             topButton.addEventListener(
                 "click",
                 toggle
@@ -1210,10 +1581,15 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            sidebar.classList.add("open");
+            sidebar.classList.add(
+                "open"
+            );
 
             if (overlay) {
-                overlay.classList.add("active");
+
+                overlay.classList.add(
+                    "active"
+                );
             }
         }
 
@@ -1224,15 +1600,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            sidebar.classList.remove("open");
+            sidebar.classList.remove(
+                "open"
+            );
 
             if (overlay) {
-                overlay.classList.remove("active");
+
+                overlay.classList.remove(
+                    "active"
+                );
             }
         }
 
 
         if (openButton) {
+
             openButton.addEventListener(
                 "click",
                 openSidebar
@@ -1241,6 +1623,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         if (closeButton) {
+
             closeButton.addEventListener(
                 "click",
                 closeSidebar
@@ -1249,6 +1632,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         if (overlay) {
+
             overlay.addEventListener(
                 "click",
                 closeSidebar
@@ -1256,16 +1640,20 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
 
-        qsa(".nav-item").forEach(function (item) {
+        qsa(
+            ".nav-item"
+        ).forEach(
+            function (item) {
 
-            item.addEventListener(
-                "click",
-                function () {
-                    closeSidebar();
-                }
-            );
+                item.addEventListener(
+                    "click",
+                    function () {
 
-        });
+                        closeSidebar();
+                    }
+                );
+            }
+        );
     }
 
 
@@ -1273,7 +1661,9 @@ document.addEventListener("DOMContentLoaded", function () {
        NAVIGATION
        ======================================================== */
 
-    function initNavigation() {
+    function navigateToView(
+        view
+    ) {
 
         const navItems =
             qsa(".nav-item");
@@ -1282,66 +1672,86 @@ document.addEventListener("DOMContentLoaded", function () {
             qsa(".view-panel");
 
 
-        navItems.forEach(function (item) {
+        navItems.forEach(
+            function (nav) {
 
-            item.addEventListener(
-                "click",
-                function () {
-
-                    const view =
-                        item.dataset.view;
-
-                    if (!view) {
-                        return;
-                    }
+                nav.classList.toggle(
+                    "active",
+                    nav.dataset.view === view
+                );
+            }
+        );
 
 
-                    navItems.forEach(function (nav) {
+        panels.forEach(
+            function (panel) {
 
-                        nav.classList.toggle(
-                            "active",
-                            nav === item
-                        );
-
-                    });
-
-
-                    panels.forEach(function (panel) {
-
-                        panel.classList.toggle(
-                            "active",
-                            panel.id ===
-                            "view-" + view
-                        );
-
-                    });
+                panel.classList.toggle(
+                    "active",
+                    panel.id ===
+                    "view-" + view
+                );
+            }
+        );
 
 
-                    state.currentView =
-                        view;
+        state.currentView =
+            view;
 
 
-                    updatePageHeading(
-                        view
-                    );
+        updatePageHeading(
+            view
+        );
 
 
-                    if (view === "roadmap") {
-                        loadRoadmap();
-                    }
+        if (
+            view === "roadmap"
+        ) {
 
-                    if (view === "interview") {
-                        prepareInterview();
-                    }
+            loadRoadmap();
+        }
 
-                }
-            );
 
-        });
+        if (
+            view === "interview"
+        ) {
+
+            prepareInterview();
+        }
     }
 
 
-    function updatePageHeading(view) {
+    function initNavigation() {
+
+        qsa(
+            ".nav-item"
+        ).forEach(
+            function (item) {
+
+                item.addEventListener(
+                    "click",
+                    function () {
+
+                        const view =
+                            item.dataset.view;
+
+                        if (!view) {
+                            return;
+                        }
+
+                        navigateToView(
+                            view
+                        );
+                    }
+                );
+            }
+        );
+    }
+
+
+    function updatePageHeading(
+        view
+    ) {
 
         const title =
             $("page-title");
@@ -1397,11 +1807,14 @@ document.addEventListener("DOMContentLoaded", function () {
         if (data[view]) {
 
             if (title) {
+
                 title.textContent =
                     data[view][0];
             }
 
+
             if (subtitle) {
+
                 subtitle.textContent =
                     data[view][1];
             }
@@ -1434,7 +1847,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 scrapeCareerUrl(
                     input.value.trim()
                 );
-
             }
         );
 
@@ -1443,7 +1855,10 @@ document.addEventListener("DOMContentLoaded", function () {
             "keydown",
             function (event) {
 
-                if (event.key === "Enter") {
+                if (
+                    event.key ===
+                    "Enter"
+                ) {
 
                     event.preventDefault();
 
@@ -1451,13 +1866,14 @@ document.addEventListener("DOMContentLoaded", function () {
                         input.value.trim()
                     );
                 }
-
             }
         );
     }
 
 
-    async function scrapeCareerUrl(url) {
+    async function scrapeCareerUrl(
+        url
+    ) {
 
         if (!url) {
 
@@ -1476,10 +1892,14 @@ document.addEventListener("DOMContentLoaded", function () {
             const parsed =
                 new URL(url);
 
+
             if (
-                parsed.protocol !== "http:" &&
-                parsed.protocol !== "https:"
+                parsed.protocol !==
+                    "http:" &&
+                parsed.protocol !==
+                    "https:"
             ) {
+
                 throw new Error();
             }
 
@@ -1525,13 +1945,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 await apiRequest(
                     "scrape_url",
                     {
-                        url: url,
-                        career_url: url
+                        url:
+                            url,
+
+                        career_url:
+                            url
                     }
                 );
 
 
-            if (!apiSuccess(result)) {
+            if (
+                !apiSuccess(result)
+            ) {
 
                 throw new Error(
                     result.message ||
@@ -1552,11 +1977,18 @@ document.addEventListener("DOMContentLoaded", function () {
             state.careerUrl =
                 url;
 
+
             state.careerJobs =
-                normalizeJobs(jobs);
+                normalizeJobs(
+                    jobs
+                );
 
 
-            if (Array.isArray(result.required_skills)) {
+            if (
+                Array.isArray(
+                    result.required_skills
+                )
+            ) {
 
                 state.requiredSkills =
                     normalizeSkills(
@@ -1565,14 +1997,18 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
 
-            if (result.recommended_job) {
+            if (
+                result.recommended_job
+            ) {
 
                 state.recommendedJob =
                     result.recommended_job;
             }
 
 
-            updateCareerInputs(url);
+            updateCareerInputs(
+                url
+            );
 
             renderJobs();
 
@@ -1606,6 +2042,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
         } catch (error) {
 
+            console.error(
+                "Career scraping error:",
+                error
+            );
+
+
             if (status) {
 
                 status.textContent =
@@ -1624,6 +2066,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 "error"
             );
 
+
         } finally {
 
             setLoading(
@@ -1634,7 +2077,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    function updateCareerInputs(url) {
+    function updateCareerInputs(
+        url
+    ) {
 
         const careerUrl =
             $("career-url");
@@ -1647,15 +2092,23 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         if (careerUrl) {
-            careerUrl.value = url;
+
+            careerUrl.value =
+                url || "";
         }
+
 
         if (jobsCareerUrl) {
-            jobsCareerUrl.value = url;
+
+            jobsCareerUrl.value =
+                url || "";
         }
 
+
         if (reportCareerUrl) {
-            reportCareerUrl.value = url;
+
+            reportCareerUrl.value =
+                url || "";
         }
     }
 
@@ -1664,7 +2117,9 @@ document.addEventListener("DOMContentLoaded", function () {
        JOB NORMALIZATION
        ======================================================== */
 
-    function normalizeJobs(jobs) {
+    function normalizeJobs(
+        jobs
+    ) {
 
         if (!Array.isArray(jobs)) {
             return [];
@@ -1672,21 +2127,30 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         return jobs
-            .map(normalizeJob)
-            .filter(function (job) {
+            .map(
+                normalizeJob
+            )
+            .filter(
+                function (job) {
 
-                return job.title ||
-                    job.company ||
-                    job.description;
-
-            });
+                    return (
+                        job.title ||
+                        job.company ||
+                        job.description
+                    );
+                }
+            );
     }
 
 
-    function normalizeJob(job) {
+    function normalizeJob(
+        job
+    ) {
 
         job =
-            job && typeof job === "object"
+            job &&
+            typeof job ===
+                "object"
                 ? job
                 : {};
 
@@ -1699,15 +2163,23 @@ document.addEventListener("DOMContentLoaded", function () {
             [];
 
 
-        let normalizedSkills = [];
+        let normalizedSkills =
+            [];
 
 
-        if (Array.isArray(skills)) {
+        if (
+            Array.isArray(skills)
+        ) {
 
             normalizedSkills =
-                normalizeSkills(skills);
+                normalizeSkills(
+                    skills
+                );
 
-        } else if (typeof skills === "string") {
+        } else if (
+            typeof skills ===
+            "string"
+        ) {
 
             normalizedSkills =
                 normalizeSkills(
@@ -1774,7 +2246,9 @@ document.addEventListener("DOMContentLoaded", function () {
        JOB MATCHING
        ======================================================== */
 
-    function calculateJobMatch(job) {
+    function calculateJobMatch(
+        job
+    ) {
 
         const userSkills =
             normalizeSkills(
@@ -1795,28 +2269,41 @@ document.addEventListener("DOMContentLoaded", function () {
                     job.description
                 );
 
-            if (!text || !userSkills.length) {
+
+            if (
+                !text ||
+                !userSkills.length
+            ) {
+
                 return 0;
             }
 
 
             let count = 0;
 
-            userSkills.forEach(function (skill) {
 
-                if (
-                    text.includes(
-                        normalizeSkill(skill)
-                    )
-                ) {
-                    count++;
+            userSkills.forEach(
+                function (skill) {
+
+                    if (
+                        text.includes(
+                            normalizeSkill(
+                                skill
+                            )
+                        )
+                    ) {
+
+                        count++;
+                    }
                 }
-
-            });
+            );
 
 
             return Math.round(
-                (count / userSkills.length) * 100
+                (
+                    count /
+                    userSkills.length
+                ) * 100
             );
         }
 
@@ -1829,37 +2316,53 @@ document.addEventListener("DOMContentLoaded", function () {
         let matched = 0;
 
 
-        jobSkills.forEach(function (required) {
+        jobSkills.forEach(
+            function (required) {
 
-            const requiredNorm =
-                normalizeSkill(required);
-
-
-            const found =
-                userSkills.some(
-                    function (userSkill) {
-
-                        const userNorm =
-                            normalizeSkill(userSkill);
-
-                        return (
-                            userNorm === requiredNorm ||
-                            userNorm.includes(requiredNorm) ||
-                            requiredNorm.includes(userNorm)
-                        );
-                    }
-                );
+                const requiredNorm =
+                    normalizeSkill(
+                        required
+                    );
 
 
-            if (found) {
-                matched++;
+                const found =
+                    userSkills.some(
+                        function (userSkill) {
+
+                            const userNorm =
+                                normalizeSkill(
+                                    userSkill
+                                );
+
+
+                            return (
+                                userNorm ===
+                                    requiredNorm ||
+
+                                userNorm.includes(
+                                    requiredNorm
+                                ) ||
+
+                                requiredNorm.includes(
+                                    userNorm
+                                )
+                            );
+                        }
+                    );
+
+
+                if (found) {
+                    matched++;
+                }
             }
-
-        });
+        );
 
 
         return Math.round(
-            (matched / jobSkills.length) * 100
+            (
+                matched /
+                jobSkills.length
+            ) * 100
         );
     }
 
@@ -1873,12 +2376,15 @@ document.addEventListener("DOMContentLoaded", function () {
         const container =
             $("job-results");
 
+
         if (!container) {
             return;
         }
 
 
-        if (!state.careerJobs.length) {
+        if (
+            !state.careerJobs.length
+        ) {
 
             container.innerHTML = `
                 <div class="empty-state-card">
@@ -1898,22 +2404,28 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const ranked =
             state.careerJobs
-                .map(function (job) {
+                .map(
+                    function (job) {
 
-                    const match =
-                        calculateJobMatch(job);
+                        return {
+                            ...job,
 
-                    return {
-                        ...job,
-                        match: match
-                    };
+                            match:
+                                calculateJobMatch(
+                                    job
+                                )
+                        };
+                    }
+                )
+                .sort(
+                    function (a, b) {
 
-                })
-                .sort(function (a, b) {
-
-                    return b.match - a.match;
-
-                });
+                        return (
+                            b.match -
+                            a.match
+                        );
+                    }
+                );
 
 
         state.careerJobs =
@@ -1921,73 +2433,79 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         const rows =
-            ranked.map(function (job) {
+            ranked.map(
+                function (job) {
 
-                const title =
-                    job.title ||
-                    "Job Opportunity";
+                    const title =
+                        job.title ||
+                        "Job Opportunity";
 
-                const company =
-                    job.company ||
-                    "—";
+                    const company =
+                        job.company ||
+                        "—";
 
-                const location =
-                    Array.isArray(job.location)
-                        ? job.location.join(", ")
-                        : job.location || "—";
-
-
-                const url =
-                    job.url &&
-                    job.url !== "#"
-                        ? job.url
-                        : "";
+                    const location =
+                        Array.isArray(
+                            job.location
+                        )
+                            ? job.location.join(
+                                ", "
+                            )
+                            : job.location ||
+                              "—";
 
 
-                return `
-                    <tr>
+                    const url =
+                        job.url &&
+                        job.url !== "#"
+                            ? job.url
+                            : "";
 
-                        <td>
-                            ${escapeHtml(title)}
-                        </td>
 
-                        <td>
-                            ${escapeHtml(company)}
-                        </td>
+                    return `
+                        <tr>
 
-                        <td>
-                            ${escapeHtml(location)}
-                        </td>
+                            <td>
+                                ${escapeHtml(title)}
+                            </td>
 
-                        <td>
-                            <span class="match-badge">
-                                ${job.match}%
-                            </span>
-                        </td>
+                            <td>
+                                ${escapeHtml(company)}
+                            </td>
 
-                        <td>
+                            <td>
+                                ${escapeHtml(location)}
+                            </td>
 
-                            ${
-                                url
-                                ? `
-                                    <a
-                                        href="${escapeHtml(url)}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="job-link"
-                                    >
-                                        View Job
-                                    </a>
-                                `
-                                : "—"
-                            }
+                            <td>
+                                <span class="match-badge">
+                                    ${job.match}%
+                                </span>
+                            </td>
 
-                        </td>
+                            <td>
 
-                    </tr>
-                `;
-            })
-            .join("");
+                                ${
+                                    url
+                                        ? `
+                                            <a
+                                                href="${escapeHtml(url)}"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="job-link"
+                                            >
+                                                View Job
+                                            </a>
+                                        `
+                                        : "—"
+                                }
+
+                            </td>
+
+                        </tr>
+                    `;
+                }
+            ).join("");
 
 
         container.innerHTML = `
@@ -2036,16 +2554,30 @@ document.addEventListener("DOMContentLoaded", function () {
             $("recommendation-description");
 
 
-        if (!state.careerJobs.length) {
+        if (
+            !state.careerJobs.length
+        ) {
 
             if (title) {
+
                 title.textContent =
                     "No job recommendation yet";
             }
 
+
             if (description) {
+
                 description.textContent =
                     "Fetch jobs from a career URL and upload your resume to generate a dynamic recommendation.";
+            }
+
+
+            const metric =
+                $("metric-match");
+
+            if (metric) {
+                metric.textContent =
+                    "0%";
             }
 
             return;
@@ -2054,9 +2586,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const sorted =
             [...state.careerJobs]
-                .sort(function (a, b) {
-                    return b.match - a.match;
-                });
+                .sort(
+                    function (a, b) {
+
+                        return (
+                            Number(b.match || 0) -
+                            Number(a.match || 0)
+                        );
+                    }
+                );
 
 
         const best =
@@ -2084,12 +2622,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const company =
                 best.company
-                    ? " at " + best.company
+                    ? " at " +
+                      best.company
                     : "";
+
 
             description.textContent =
                 "Best current skill match: " +
-                best.match +
+                Number(
+                    best.match || 0
+                ) +
                 "%" +
                 company +
                 ".";
@@ -2099,9 +2641,13 @@ document.addEventListener("DOMContentLoaded", function () {
         const metric =
             $("metric-match");
 
+
         if (metric) {
+
             metric.textContent =
-                best.match + "%";
+                Number(
+                    best.match || 0
+                ) + "%";
         }
     }
 
@@ -2115,86 +2661,91 @@ document.addEventListener("DOMContentLoaded", function () {
         let bestMatch = 0;
 
 
-        if (state.careerJobs.length) {
+        state.careerJobs.forEach(
+            function (job) {
 
-            state.careerJobs.forEach(
-                function (job) {
+                const match =
+                    Number(
+                        job.match ||
+                        calculateJobMatch(
+                            job
+                        ) ||
+                        0
+                    );
 
-                    const match =
-                        Number(
-                            job.match ||
-                            calculateJobMatch(job)
-                        );
 
-                    if (match > bestMatch) {
-                        bestMatch = match;
-                    }
+                if (
+                    match >
+                    bestMatch
+                ) {
 
+                    bestMatch =
+                        match;
                 }
+            }
+        );
+
+
+        const ats =
+            Math.round(
+                state.atsScore || 0
             );
-        }
+
+
+        const jobCount =
+            state.careerJobs.length;
+
+
+        const skillCount =
+            state.extractedSkills.length;
 
 
         const values = {
 
             "stat-skills":
-                state.extractedSkills.length,
+                skillCount,
 
             "stat-ats":
-                Math.round(
-                    state.atsScore || 0
-                ),
+                ats + "%",
 
             "stat-jobs":
-                state.careerJobs.length,
+                jobCount,
 
             "stat-match":
-                bestMatch,
+                bestMatch + "%",
+
 
             "metric-skills":
-                state.extractedSkills.length,
+                skillCount,
 
             "metric-ats":
-                Math.round(
-                    state.atsScore || 0
-                ),
+                ats + "%",
 
             "metric-jobs":
-                state.careerJobs.length,
+                jobCount,
 
             "metric-match":
                 bestMatch + "%"
         };
 
 
-        Object.keys(values).forEach(
-            function (id) {
+        Object.keys(values)
+            .forEach(
+                function (id) {
 
-                const element =
-                    $(id);
+                    const element =
+                        $(id);
 
-                if (!element) {
-                    return;
+
+                    if (!element) {
+                        return;
+                    }
+
+
+                    element.textContent =
+                        values[id];
                 }
-
-
-                let value =
-                    values[id];
-
-
-                if (
-                    id === "stat-ats" ||
-                    id === "metric-ats"
-                ) {
-                    value =
-                        Number(value) + "%";
-                }
-
-
-                element.textContent =
-                    value;
-            }
-        );
+            );
     }
 
 
@@ -2229,7 +2780,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 function () {
 
                     input.click();
-
                 }
             );
         }
@@ -2247,11 +2797,11 @@ document.addEventListener("DOMContentLoaded", function () {
                     state.selectedResume =
                         input.files[0];
 
+
                     updateResumeFileName(
                         input.files[0].name
                     );
                 }
-
             }
         );
 
@@ -2261,41 +2811,43 @@ document.addEventListener("DOMContentLoaded", function () {
             [
                 "dragenter",
                 "dragover"
-            ].forEach(function (eventName) {
+            ].forEach(
+                function (eventName) {
 
-                dropZone.addEventListener(
-                    eventName,
-                    function (event) {
+                    dropZone.addEventListener(
+                        eventName,
+                        function (event) {
 
-                        event.preventDefault();
+                            event.preventDefault();
 
-                        dropZone.classList.add(
-                            "dragover"
-                        );
-                    }
-                );
-
-            });
+                            dropZone.classList.add(
+                                "dragover"
+                            );
+                        }
+                    );
+                }
+            );
 
 
             [
                 "dragleave",
                 "drop"
-            ].forEach(function (eventName) {
+            ].forEach(
+                function (eventName) {
 
-                dropZone.addEventListener(
-                    eventName,
-                    function (event) {
+                    dropZone.addEventListener(
+                        eventName,
+                        function (event) {
 
-                        event.preventDefault();
+                            event.preventDefault();
 
-                        dropZone.classList.remove(
-                            "dragover"
-                        );
-                    }
-                );
-
-            });
+                            dropZone.classList.remove(
+                                "dragover"
+                            );
+                        }
+                    );
+                }
+            );
 
 
             dropZone.addEventListener(
@@ -2311,17 +2863,27 @@ document.addEventListener("DOMContentLoaded", function () {
                         files.length
                     ) {
 
-                        input.files =
-                            files;
+                        try {
+
+                            input.files =
+                                files;
+
+                        } catch (error) {
+                            /*
+                             * Some browsers do not allow
+                             * assigning files directly.
+                             */
+                        }
+
 
                         state.selectedResume =
                             files[0];
+
 
                         updateResumeFileName(
                             files[0].name
                         );
                     }
-
                 }
             );
         }
@@ -2336,19 +2898,22 @@ document.addEventListener("DOMContentLoaded", function () {
                     event.preventDefault();
 
                     uploadResume();
-
                 }
             );
         }
     }
 
 
-    function updateResumeFileName(name) {
+    function updateResumeFileName(
+        name
+    ) {
 
         const element =
             $("resume-file-name");
 
+
         if (element) {
+
             element.textContent =
                 name || "";
         }
@@ -2416,7 +2981,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
 
 
-            if (!apiSuccess(result)) {
+            if (
+                !apiSuccess(result)
+            ) {
 
                 throw new Error(
                     result.message ||
@@ -2500,9 +3067,15 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    function updateResumeContact(data) {
+    function updateResumeContact(
+        data
+    ) {
 
-        if (!data || typeof data !== "object") {
+        if (
+            !data ||
+            typeof data !== "object"
+        ) {
+
             return;
         }
 
@@ -2527,22 +3100,24 @@ document.addEventListener("DOMContentLoaded", function () {
         };
 
 
-        Object.keys(fields).forEach(
-            function (id) {
+        Object.keys(fields)
+            .forEach(
+                function (id) {
 
-                const element =
-                    $(id);
+                    const element =
+                        $(id);
 
-                if (
-                    element &&
-                    fields[id] != null
-                ) {
 
-                    element.textContent =
-                        fields[id];
+                    if (
+                        element &&
+                        fields[id] != null
+                    ) {
+
+                        element.textContent =
+                            fields[id];
+                    }
                 }
-            }
-        );
+            );
     }
 
 
@@ -2623,12 +3198,15 @@ document.addEventListener("DOMContentLoaded", function () {
         const container =
             $("resume-skills-list");
 
+
         if (!container) {
             return;
         }
 
 
-        if (!state.extractedSkills.length) {
+        if (
+            !state.extractedSkills.length
+        ) {
 
             container.innerHTML = `
                 <span class="empty-state">
@@ -2642,15 +3220,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
         container.innerHTML =
             state.extractedSkills
-                .map(function (skill) {
+                .map(
+                    function (skill) {
 
-                    return `
-                        <span class="skill-tag">
-                            ${escapeHtml(skill)}
-                        </span>
-                    `;
-
-                })
+                        return `
+                            <span class="skill-tag">
+                                ${escapeHtml(skill)}
+                            </span>
+                        `;
+                    }
+                )
                 .join("");
     }
 
@@ -2679,15 +3258,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 userContainer.innerHTML =
                     state.extractedSkills
-                        .map(function (skill) {
+                        .map(
+                            function (skill) {
 
-                            return `
-                                <span class="skill-tag">
-                                    ${escapeHtml(skill)}
-                                </span>
-                            `;
-
-                        })
+                                return `
+                                    <span class="skill-tag">
+                                        ${escapeHtml(skill)}
+                                    </span>
+                                `;
+                            }
+                        )
                         .join("");
 
             } else {
@@ -2709,15 +3289,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 requiredContainer.innerHTML =
                     state.requiredSkills
-                        .map(function (skill) {
+                        .map(
+                            function (skill) {
 
-                            return `
-                                <span class="skill-tag required">
-                                    ${escapeHtml(skill)}
-                                </span>
-                            `;
-
-                        })
+                                return `
+                                    <span class="skill-tag required">
+                                        ${escapeHtml(skill)}
+                                    </span>
+                                `;
+                            }
+                        )
                         .join("");
 
             } else {
@@ -2744,7 +3325,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 function (skill) {
 
                     const normalized =
-                        normalizeSkill(skill);
+                        normalizeSkill(
+                            skill
+                        );
+
 
                     return !Array.from(
                         userNormalized
@@ -2752,11 +3336,17 @@ document.addEventListener("DOMContentLoaded", function () {
                         function (userSkill) {
 
                             return (
-                                userSkill === normalized ||
-                                userSkill.includes(normalized) ||
-                                normalized.includes(userSkill)
-                            );
+                                userSkill ===
+                                    normalized ||
 
+                                userSkill.includes(
+                                    normalized
+                                ) ||
+
+                                normalized.includes(
+                                    userSkill
+                                )
+                            );
                         }
                     );
                 }
@@ -2769,15 +3359,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 missingContainer.innerHTML =
                     missing
-                        .map(function (skill) {
+                        .map(
+                            function (skill) {
 
-                            return `
-                                <span class="skill-tag missing">
-                                    ${escapeHtml(skill)}
-                                </span>
-                            `;
-
-                        })
+                                return `
+                                    <span class="skill-tag missing">
+                                        ${escapeHtml(skill)}
+                                    </span>
+                                `;
+                            }
+                        )
                         .join("");
 
             } else {
@@ -2803,15 +3394,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
 
-        if (
-            !state.targetRole &&
-            !state.requiredSkills.length
-        ) {
-            updateStats();
-            return;
-        }
-
-
         try {
 
             const result =
@@ -2832,7 +3414,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
 
 
-            if (!apiSuccess(result)) {
+            if (
+                !apiSuccess(result)
+            ) {
+
+                updateStats();
+
                 return;
             }
 
@@ -2882,18 +3469,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
             updateStats();
 
-        } catch (error) {
+            renderDashboardCharts();
 
-            /*
-             * Metrics are supplementary.
-             * Do not block the dashboard if metrics
-             * endpoint is unavailable.
-             */
+
+        } catch (error) {
 
             console.warn(
                 "Metrics unavailable:",
                 error.message
             );
+
+
+            updateStats();
         }
     }
 
@@ -2905,8 +3492,10 @@ document.addEventListener("DOMContentLoaded", function () {
     function initCharts() {
 
         if (
-            typeof Chart === "undefined"
+            typeof Chart ===
+            "undefined"
         ) {
+
             return;
         }
 
@@ -2924,9 +3513,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 new Chart(
                     skillsCanvas,
                     {
-                        type: "doughnut",
+                        type:
+                            "doughnut",
 
                         data: {
+
                             labels: [
                                 "Your Skills",
                                 "Skill Gap"
@@ -2935,10 +3526,8 @@ document.addEventListener("DOMContentLoaded", function () {
                             datasets: [
                                 {
                                     data: [
-                                        Math.max(
-                                            state.extractedSkills.length,
-                                            0
-                                        ),
+                                        state.extractedSkills.length,
+
                                         Math.max(
                                             state.requiredSkills.length -
                                             state.extractedSkills.length,
@@ -2950,11 +3539,16 @@ document.addEventListener("DOMContentLoaded", function () {
                         },
 
                         options: {
-                            responsive: true,
+
+                            responsive:
+                                true,
 
                             plugins: {
+
                                 legend: {
-                                    position: "bottom"
+
+                                    position:
+                                        "bottom"
                                 }
                             }
                         }
@@ -2969,9 +3563,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 new Chart(
                     readinessCanvas,
                     {
-                        type: "doughnut",
+                        type:
+                            "doughnut",
 
                         data: {
+
                             labels: [
                                 "ATS",
                                 "Remaining"
@@ -2983,6 +3579,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                         Math.round(
                                             state.atsScore
                                         ),
+
                                         Math.max(
                                             100 -
                                             Math.round(
@@ -2996,11 +3593,16 @@ document.addEventListener("DOMContentLoaded", function () {
                         },
 
                         options: {
-                            responsive: true,
+
+                            responsive:
+                                true,
 
                             plugins: {
+
                                 legend: {
-                                    position: "bottom"
+
+                                    position:
+                                        "bottom"
                                 }
                             }
                         }
@@ -3029,6 +3631,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     )
                 ];
 
+
             state.charts.skills.update();
         }
 
@@ -3046,12 +3649,15 @@ document.addEventListener("DOMContentLoaded", function () {
             state.charts.readiness.data
                 .datasets[0]
                 .data = [
+
                     score,
+
                     Math.max(
                         100 - score,
                         0
                     )
                 ];
+
 
             state.charts.readiness.update();
         }
@@ -3096,7 +3702,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
 
 
-                scrapeCareerUrl(url);
+                scrapeCareerUrl(
+                    url
+                );
             }
         );
     }
@@ -3135,9 +3743,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 </div>
             `;
 
+
             if (resources) {
-                resources.innerHTML = "";
+                resources.innerHTML =
+                    "";
             }
+
 
             return;
         }
@@ -3152,9 +3763,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
 
+            /*
+             * Correct API action:
+             * api.php uses get_roadmap
+             */
+
             const result =
                 await apiRequest(
-                    "generate_roadmap",
+                    "get_roadmap",
                     {
                         required_skills:
                             JSON.stringify(
@@ -3167,12 +3783,15 @@ document.addEventListener("DOMContentLoaded", function () {
                             ),
 
                         target_role:
-                            state.targetRole || ""
+                            state.targetRole ||
+                            ""
                     }
                 );
 
 
-            if (!apiSuccess(result)) {
+            if (
+                !apiSuccess(result)
+            ) {
 
                 throw new Error(
                     result.message ||
@@ -3219,17 +3838,24 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    function renderRoadmap(roadmap) {
+    function renderRoadmap(
+        roadmap
+    ) {
 
         const container =
             $("container-dynamic-roadmap");
+
 
         if (!container) {
             return;
         }
 
 
-        if (!Array.isArray(roadmap)) {
+        if (
+            !Array.isArray(
+                roadmap
+            )
+        ) {
 
             container.innerHTML = `
                 <div class="empty-state-card">
@@ -3264,11 +3890,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 function (item, index) {
 
                     if (
-                        typeof item === "string"
+                        typeof item ===
+                        "string"
                     ) {
 
                         return `
                             <div class="roadmap-step">
+
                                 <div class="roadmap-number">
                                     ${index + 1}
                                 </div>
@@ -3276,6 +3904,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                 <div>
                                     ${escapeHtml(item)}
                                 </div>
+
                             </div>
                         `;
                     }
@@ -3286,6 +3915,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         item.skill ||
                         item.name ||
                         "Learning Step";
+
 
                     const description =
                         item.description ||
@@ -3319,21 +3949,26 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    function renderResources(resources) {
+    function renderResources(
+        resources
+    ) {
 
         const container =
             $("container-dynamic-resources");
+
 
         if (!container) {
             return;
         }
 
 
-        if (!Array.isArray(resources) ||
+        if (
+            !Array.isArray(resources) ||
             !resources.length
         ) {
 
-            container.innerHTML = "";
+            container.innerHTML =
+                "";
 
             return;
         }
@@ -3353,7 +3988,8 @@ document.addEventListener("DOMContentLoaded", function () {
                             function (resource) {
 
                                 if (
-                                    typeof resource === "string"
+                                    typeof resource ===
+                                    "string"
                                 ) {
 
                                     return `
@@ -3368,6 +4004,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                     resource.title ||
                                     resource.name ||
                                     "Resource";
+
 
                                 const url =
                                     resource.url ||
@@ -3476,12 +4113,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
 
+            /*
+             * Correct API action:
+             * api.php uses get_interview
+             */
+
             const result =
                 await apiRequest(
-                    "generate_interview_question",
+                    "get_interview",
                     {
                         target_role:
-                            state.targetRole || "",
+                            state.targetRole ||
+                            "",
 
                         extracted_skills:
                             JSON.stringify(
@@ -3496,7 +4139,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
 
 
-            if (!apiSuccess(result)) {
+            if (
+                !apiSuccess(result)
+            ) {
 
                 throw new Error(
                     result.message ||
@@ -3507,11 +4152,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const generated =
                 result.question ||
+                result.interview_question ||
                 result.data?.question ||
                 "Tell me about your most relevant technical project.";
 
 
             if (question) {
+
                 question.textContent =
                     generated;
             }
@@ -3520,16 +4167,22 @@ document.addEventListener("DOMContentLoaded", function () {
             const answer =
                 $("interview-answer");
 
+
             if (answer) {
-                answer.value = "";
+
+                answer.value =
+                    "";
             }
 
 
             const feedback =
                 $("interview-feedback");
 
+
             if (feedback) {
-                feedback.innerHTML = "";
+
+                feedback.innerHTML =
+                    "";
             }
 
 
@@ -3541,6 +4194,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 "Unable to generate question.",
                 "error"
             );
+
 
         } finally {
 
@@ -3568,10 +4222,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         const answerText =
-            answer?.value.trim() || "";
+            answer?.value.trim() ||
+            "";
 
         const questionText =
-            question?.textContent.trim() || "";
+            question?.textContent.trim() ||
+            "";
 
 
         if (!answerText) {
@@ -3595,9 +4251,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
 
+            /*
+             * Correct API action:
+             * api.php uses evaluate_answer
+             */
+
             const result =
                 await apiRequest(
-                    "evaluate_interview",
+                    "evaluate_answer",
                     {
                         question:
                             questionText,
@@ -3606,12 +4267,15 @@ document.addEventListener("DOMContentLoaded", function () {
                             answerText,
 
                         target_role:
-                            state.targetRole || ""
+                            state.targetRole ||
+                            ""
                     }
                 );
 
 
-            if (!apiSuccess(result)) {
+            if (
+                !apiSuccess(result)
+            ) {
 
                 throw new Error(
                     result.message ||
@@ -3629,15 +4293,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (feedback) {
 
-                feedback.innerHTML =
-                    `
-                        <strong>Feedback</strong>
-                        <p>
-                            ${escapeHtml(
-                                evaluation
-                            )}
-                        </p>
-                    `;
+                feedback.innerHTML = `
+                    <strong>Feedback</strong>
+                    <p>
+                        ${escapeHtml(
+                            evaluation
+                        )}
+                    </p>
+                `;
             }
 
 
@@ -3649,6 +4312,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 "Unable to evaluate answer.",
                 "error"
             );
+
 
         } finally {
 
@@ -3701,7 +4365,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         const prompt =
-            input?.value.trim() || "";
+            input?.value.trim() ||
+            "";
 
 
         if (!prompt) {
@@ -3725,15 +4390,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
 
+            /*
+             * Correct API action:
+             * api.php uses ask_interview_ai
+             */
+
             const result =
                 await apiRequest(
-                    "ai_assistant",
+                    "ask_interview_ai",
                     {
                         prompt:
                             prompt,
 
                         target_role:
-                            state.targetRole || "",
+                            state.targetRole ||
+                            "",
 
                         extracted_skills:
                             JSON.stringify(
@@ -3748,7 +4419,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
 
 
-            if (!apiSuccess(result)) {
+            if (
+                !apiSuccess(result)
+            ) {
 
                 throw new Error(
                     result.message ||
@@ -3761,22 +4434,26 @@ document.addEventListener("DOMContentLoaded", function () {
                 result.response ||
                 result.answer ||
                 result.data?.response ||
+                result.data?.answer ||
                 "No response was returned.";
 
 
             if (responseCard) {
+
                 responseCard.style.display =
                     "block";
             }
 
 
             if (title) {
+
                 title.textContent =
                     "Career Assistant";
             }
 
 
             if (body) {
+
                 body.innerHTML =
                     escapeHtml(
                         response
@@ -3795,6 +4472,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 "Unable to process your question.",
                 "error"
             );
+
 
         } finally {
 
@@ -3829,7 +4507,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
                 const data =
-                    new FormData(form);
+                    new FormData(
+                        form
+                    );
 
 
                 try {
@@ -3841,7 +4521,9 @@ document.addEventListener("DOMContentLoaded", function () {
                         );
 
 
-                    if (!apiSuccess(result)) {
+                    if (
+                        !apiSuccess(result)
+                    ) {
 
                         throw new Error(
                             result.message ||
@@ -3896,7 +4578,6 @@ document.addEventListener("DOMContentLoaded", function () {
                         "error"
                     );
                 }
-
             }
         );
     }
@@ -3934,8 +4615,9 @@ document.addEventListener("DOMContentLoaded", function () {
                         apiSuccess(result)
                     ) {
 
-                        window.location.href =
-                            window.location.pathname;
+                        window.location.replace(
+                            window.location.pathname
+                        );
 
                     } else {
 
@@ -3955,7 +4637,6 @@ document.addEventListener("DOMContentLoaded", function () {
                         "error"
                     );
                 }
-
             }
         );
     }
@@ -3969,6 +4650,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const form =
             $("report-form");
+
 
         if (!form) {
             return;
@@ -3984,6 +4666,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
                 if (input) {
+
                     input.value =
                         state.careerUrl ||
                         "";
@@ -4011,14 +4694,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         const canvas =
-            document.createElement("canvas");
+            document.createElement(
+                "canvas"
+            );
 
-        canvas.width = 64;
-        canvas.height = 64;
+
+        canvas.width =
+            64;
+
+        canvas.height =
+            64;
 
 
         const context =
-            canvas.getContext("2d");
+            canvas.getContext(
+                "2d"
+            );
 
 
         if (!context) {
@@ -4049,6 +4740,7 @@ document.addEventListener("DOMContentLoaded", function () {
         context.textBaseline =
             "middle";
 
+
         context.fillText(
             "SG",
             32,
@@ -4057,7 +4749,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         const link =
-            document.createElement("link");
+            document.createElement(
+                "link"
+            );
+
 
         link.rel =
             "icon";
@@ -4084,13 +4779,16 @@ document.addEventListener("DOMContentLoaded", function () {
             window.APP_DATA?.careerUrl ||
             "";
 
+
         state.targetCompany =
             window.APP_DATA?.targetCompany ||
             "";
 
+
         state.targetRole =
             window.APP_DATA?.targetRole ||
             "";
+
 
         state.requiredSkills =
             normalizeSkills(
@@ -4098,11 +4796,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 []
             );
 
+
         state.extractedSkills =
             normalizeSkills(
                 window.APP_DATA?.extractedSkills ||
                 []
             );
+
 
         state.careerJobs =
             normalizeJobs(
@@ -4110,11 +4810,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 []
             );
 
+
         state.atsScore =
             Number(
                 window.APP_DATA?.atsScore ||
                 0
             );
+
 
         state.recommendedJob =
             window.APP_DATA?.recommendedJob ||
@@ -4128,10 +4830,63 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
     /* ========================================================
+       AUTH SCREEN / APP SHELL
+       ======================================================== */
+
+    function initializeAuthVisibility() {
+
+        const authScreen =
+            $("auth-screen");
+
+        const appShell =
+            $("app-shell");
+
+
+        if (state.loggedIn) {
+
+            if (authScreen) {
+
+                authScreen.style.display =
+                    "none";
+            }
+
+
+            if (appShell) {
+
+                appShell.style.display =
+                    "";
+            }
+
+        } else {
+
+            if (authScreen) {
+
+                authScreen.style.display =
+                    "";
+            }
+
+
+            if (appShell) {
+
+                appShell.style.display =
+                    "none";
+            }
+        }
+    }
+
+
+    /* ========================================================
        INITIALIZATION
        ======================================================== */
 
     function initializeApplication() {
+
+        /*
+         * Authentication visibility is handled first.
+         */
+
+        initializeAuthVisibility();
+
 
         initAuthTabs();
 
@@ -4163,7 +4918,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
         initReport();
 
+
         initializeTarget();
+
 
         renderATS();
 
@@ -4177,11 +4934,26 @@ document.addEventListener("DOMContentLoaded", function () {
 
         updateStats();
 
+
         initCharts();
 
         renderDashboardCharts();
 
-        loadMetrics();
+
+        if (state.loggedIn) {
+
+            loadMetrics();
+
+            /*
+             * Always start authenticated users
+             * on Dashboard after login/reload.
+             */
+
+            navigateToView(
+                "dashboard"
+            );
+        }
+
 
         initializeFavicon();
 
