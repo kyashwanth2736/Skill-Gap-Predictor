@@ -1,6 +1,35 @@
 <?php
-session_start();
+
+/* ============================================================
+   SESSION CONFIGURATION
+   ============================================================ */
+
+$isHttps =
+    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    ||
+    (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
+        && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+
+if (session_status() === PHP_SESSION_NONE) {
+
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => '',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+
+    session_start();
+}
+
 require_once __DIR__ . '/db.php';
+
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
 
 function h($value) {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
@@ -24,15 +53,87 @@ function formatSocialUrl($url) {
     return $url;
 }
 
+
 /* ============================================================
    CURRENT USER
    ============================================================ */
 
 $user = null;
 
-if (function_exists('getCurrentUser')) {
-    $user = getCurrentUser();
+
+/*
+ * IMPORTANT:
+ * First trust the authenticated session created by api.php.
+ * This prevents index.php from immediately returning to the
+ * login screen after a successful login.
+ */
+
+if (
+    isset($_SESSION['logged_in']) &&
+    $_SESSION['logged_in'] === true &&
+    isset($_SESSION['user']) &&
+    is_array($_SESSION['user'])
+) {
+    $user = $_SESSION['user'];
 }
+
+
+/*
+ * Backward compatibility:
+ * If the application already has a getCurrentUser() function,
+ * use it only when the session user is not already available.
+ */
+
+if (!$user && function_exists('getCurrentUser')) {
+
+    try {
+
+        $currentUser = getCurrentUser();
+
+        if (is_array($currentUser) && !empty($currentUser)) {
+            $user = $currentUser;
+
+            /*
+             * Synchronize the session so all parts of the
+             * application use the same authenticated user.
+             */
+
+            $_SESSION['user'] = $user;
+            $_SESSION['logged_in'] = true;
+
+            if (isset($user['id'])) {
+                $_SESSION['user_id'] = (int)$user['id'];
+            }
+        }
+
+    } catch (Throwable $e) {
+
+        $user = null;
+    }
+}
+
+
+/*
+ * Final fallback:
+ * If a session user exists but logged_in was not created by
+ * an older version of api.php, still recognize the session.
+ */
+
+if (
+    !$user &&
+    isset($_SESSION['user']) &&
+    is_array($_SESSION['user']) &&
+    !empty($_SESSION['user'])
+) {
+    $user = $_SESSION['user'];
+
+    $_SESSION['logged_in'] = true;
+
+    if (isset($user['id'])) {
+        $_SESSION['user_id'] = (int)$user['id'];
+    }
+}
+
 
 /* ============================================================
    SESSION DATA
@@ -42,23 +143,45 @@ $careerUrl = $_SESSION['career_url'] ?? '';
 $targetCompany = $_SESSION['target_company'] ?? '';
 $targetRole = $_SESSION['target_role'] ?? '';
 
-$requiredSkills = safeArray($_SESSION['required_skills'] ?? []);
-$extractedSkills = safeArray($_SESSION['extracted_skills'] ?? []);
+$requiredSkills = safeArray(
+    $_SESSION['required_skills'] ?? []
+);
 
-$atsScore = (float)($_SESSION['ats_score'] ?? 0);
-$recommendedJob = $_SESSION['recommended_job'] ?? null;
+$extractedSkills = safeArray(
+    $_SESSION['extracted_skills'] ?? []
+);
 
-$careerJobs = safeArray($_SESSION['career_jobs'] ?? []);
+$atsScore = (float)(
+    $_SESSION['ats_score'] ?? 0
+);
+
+$recommendedJob =
+    $_SESSION['recommended_job'] ?? null;
+
+$careerJobs = safeArray(
+    $_SESSION['career_jobs'] ?? []
+);
+
 
 /* ============================================================
    RESUME DATA
    ============================================================ */
 
-$resumeName = $_SESSION['resume_name'] ?? '';
-$resumeEmail = $_SESSION['resume_email'] ?? '';
-$resumePhone = $_SESSION['resume_phone'] ?? '';
-$resumeLinkedin = $_SESSION['resume_linkedin'] ?? '';
-$resumeGithub = $_SESSION['resume_github'] ?? '';
+$resumeName =
+    $_SESSION['resume_name'] ?? '';
+
+$resumeEmail =
+    $_SESSION['resume_email'] ?? '';
+
+$resumePhone =
+    $_SESSION['resume_phone'] ?? '';
+
+$resumeLinkedin =
+    $_SESSION['resume_linkedin'] ?? '';
+
+$resumeGithub =
+    $_SESSION['resume_github'] ?? '';
+
 
 /* ============================================================
    RESUME HISTORY
@@ -66,36 +189,70 @@ $resumeGithub = $_SESSION['resume_github'] ?? '';
 
 $resumeHistory = [];
 
-if ($user && function_exists('getResumeHistoryForStudent')) {
+if (
+    $user &&
+    function_exists('getResumeHistoryForStudent')
+) {
+
     try {
+
         $resumeHistory = safeArray(
-            getResumeHistoryForStudent($user['id'] ?? null)
+            getResumeHistoryForStudent(
+                $user['id'] ?? null
+            )
         );
+
     } catch (Throwable $e) {
+
         $resumeHistory = [];
     }
 }
+
 
 /* ============================================================
    APP DATA FOR JAVASCRIPT
    ============================================================ */
 
 $appData = [
-    'loggedIn' => (bool)$user,
-    'user' => $user,
-    'careerUrl' => $careerUrl,
-    'targetCompany' => $targetCompany,
-    'targetRole' => $targetRole,
-    'requiredSkills' => $requiredSkills,
-    'extractedSkills' => $extractedSkills,
-    'atsScore' => $atsScore,
-    'recommendedJob' => $recommendedJob,
-    'careerJobs' => $careerJobs
+
+    'loggedIn' =>
+        (bool)$user,
+
+    'user' =>
+        $user,
+
+    'careerUrl' =>
+        $careerUrl,
+
+    'targetCompany' =>
+        $targetCompany,
+
+    'targetRole' =>
+        $targetRole,
+
+    'requiredSkills' =>
+        $requiredSkills,
+
+    'extractedSkills' =>
+        $extractedSkills,
+
+    'atsScore' =>
+        $atsScore,
+
+    'recommendedJob' =>
+        $recommendedJob,
+
+    'careerJobs' =>
+        $careerJobs
 ];
+
 ?>
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -103,17 +260,24 @@ $appData = [
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Skill-Gap Predictor</title>
+    <title>
+        Skill-Gap Predictor
+    </title>
+
 
     <link
         rel="stylesheet"
         href="static/styles.css?v=<?php echo time(); ?>"
     >
 
+
     <script>
+
         window.APP_DATA = <?php
+
             echo json_encode(
                 $appData,
+
                 JSON_UNESCAPED_SLASHES |
                 JSON_UNESCAPED_UNICODE |
                 JSON_HEX_TAG |
@@ -121,25 +285,41 @@ $appData = [
                 JSON_HEX_APOS |
                 JSON_HEX_QUOT
             );
+
         ?>;
+
 
         window.USER_LOGGED_IN =
             <?php echo $user ? 'true' : 'false'; ?>;
 
+
         window.BENCHMARK_DATA = [];
+
+
     </script>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/chart.js"
+    ></script>
+
 </head>
 
+
 <body>
+
 
 <!-- ============================================================
      PAGE LOADER
      ============================================================ -->
 
-<div id="page-loader" class="page-loader">
+<div
+    id="page-loader"
+    class="page-loader"
+>
+
     <div class="loader-card">
+
         <div class="loader-ring"></div>
 
         <div class="loader-title">
@@ -149,19 +329,26 @@ $appData = [
         <div class="loader-text">
             Loading Career Navigation AI...
         </div>
+
     </div>
+
 </div>
 
 
 <?php if (!$user): ?>
 
+
 <!-- ============================================================
      AUTH SCREEN
      ============================================================ -->
 
-<div id="auth-screen" class="auth-screen">
+<div
+    id="auth-screen"
+    class="auth-screen"
+>
 
     <div class="auth-container">
+
 
         <div class="auth-brand">
 
@@ -170,17 +357,22 @@ $appData = [
             </div>
 
             <div>
-                <h1>Skill-Gap Predictor</h1>
+
+                <h1>
+                    Skill-Gap Predictor
+                </h1>
 
                 <p>
                     Career Navigation & Skill Analysis
                 </p>
+
             </div>
 
         </div>
 
 
         <div class="auth-card">
+
 
             <!-- AUTH TABS -->
 
@@ -194,6 +386,7 @@ $appData = [
                 >
                     Login
                 </button>
+
 
                 <button
                     type="button"
@@ -217,11 +410,15 @@ $appData = [
             >
 
                 <div class="auth-heading">
-                    <h2>Welcome Back</h2>
+
+                    <h2>
+                        Welcome Back
+                    </h2>
 
                     <p>
                         Sign in to continue your career analysis.
                     </p>
+
                 </div>
 
 
@@ -231,6 +428,7 @@ $appData = [
                     style="display:none;"
                 ></div>
 
+
                 <div
                     id="login-success-msg"
                     class="auth-message success"
@@ -239,6 +437,7 @@ $appData = [
 
 
                 <form id="form-login">
+
 
                     <div class="form-group">
 
@@ -264,6 +463,7 @@ $appData = [
                             Password
                         </label>
 
+
                         <div class="password-field">
 
                             <input
@@ -274,6 +474,7 @@ $appData = [
                                 autocomplete="current-password"
                                 required
                             >
+
 
                             <button
                                 type="button"
@@ -297,6 +498,7 @@ $appData = [
                         Login
                     </button>
 
+
                 </form>
 
             </div>
@@ -313,7 +515,9 @@ $appData = [
 
                 <div class="auth-heading">
 
-                    <h2>Create Account</h2>
+                    <h2>
+                        Create Account
+                    </h2>
 
                     <p>
                         Create your account to start your career analysis.
@@ -337,6 +541,7 @@ $appData = [
 
 
                 <form id="form-signup">
+
 
                     <div class="form-group">
 
@@ -379,6 +584,7 @@ $appData = [
                             Password
                         </label>
 
+
                         <div class="password-field">
 
                             <input
@@ -389,6 +595,7 @@ $appData = [
                                 autocomplete="new-password"
                                 required
                             >
+
 
                             <button
                                 type="button"
@@ -405,6 +612,7 @@ $appData = [
 
 
                     <div class="form-row">
+
 
                         <div class="form-group">
 
@@ -437,10 +645,12 @@ $appData = [
 
                         </div>
 
+
                     </div>
 
 
                     <div class="form-row">
+
 
                         <div class="form-group">
 
@@ -474,6 +684,7 @@ $appData = [
                             >
 
                         </div>
+
 
                     </div>
 
@@ -537,6 +748,7 @@ $appData = [
                         Create Account
                     </button>
 
+
                 </form>
 
             </div>
@@ -555,7 +767,11 @@ $appData = [
      APPLICATION SHELL
      ============================================================ -->
 
-<div id="app-shell" class="app-shell">
+<div
+    id="app-shell"
+    class="app-shell"
+>
+
 
     <!-- ========================================================
          SIDEBAR
@@ -565,6 +781,7 @@ $appData = [
         id="app-sidebar"
         class="app-sidebar"
     >
+
 
         <div class="sidebar-header">
 
@@ -604,15 +821,26 @@ $appData = [
         <div class="sidebar-user">
 
             <div class="user-avatar">
+
                 <?php
-                $userName = $user['name'] ?? 'User';
+
+                $userName =
+                    $user['name'] ?? 'User';
+
                 echo h(
                     strtoupper(
-                        substr(trim($userName), 0, 1)
+                        substr(
+                            trim($userName),
+                            0,
+                            1
+                        )
                     )
                 );
+
                 ?>
+
             </div>
+
 
             <div class="user-info">
 
@@ -634,6 +862,7 @@ $appData = [
 
 
         <nav class="sidebar-nav">
+
 
             <button
                 type="button"
@@ -714,18 +943,27 @@ $appData = [
                 <span>Profile</span>
             </button>
 
+
         </nav>
 
 
         <div class="sidebar-footer">
+
 
             <button
                 type="button"
                 id="sidebar-theme-toggle"
                 class="theme-button"
             >
-                <span id="theme-icon">☾</span>
-                <span id="theme-text">Dark Mode</span>
+
+                <span id="theme-icon">
+                    ☾
+                </span>
+
+                <span id="theme-text">
+                    Dark Mode
+                </span>
+
             </button>
 
 
@@ -734,11 +972,20 @@ $appData = [
                 id="btn-logout"
                 class="logout-button"
             >
-                <span>↪</span>
-                <span>Logout</span>
+
+                <span>
+                    ↪
+                </span>
+
+                <span>
+                    Logout
+                </span>
+
             </button>
 
+
         </div>
+
 
     </aside>
 
@@ -755,9 +1002,12 @@ $appData = [
 
     <main class="app-main">
 
+
         <header class="topbar">
 
+
             <div class="topbar-left">
+
 
                 <button
                     type="button"
@@ -781,10 +1031,12 @@ $appData = [
 
                 </div>
 
+
             </div>
 
 
             <div class="topbar-right">
+
 
                 <button
                     type="button"
@@ -795,7 +1047,9 @@ $appData = [
                     ☾
                 </button>
 
+
             </div>
+
 
         </header>
 
@@ -811,6 +1065,7 @@ $appData = [
                 id="view-dashboard"
                 class="view-panel active"
             >
+
 
                 <div class="welcome-banner">
 
@@ -834,9 +1089,8 @@ $appData = [
                 </div>
 
 
-                <!-- CAREER URL -->
-
                 <div class="content-card career-source-card">
+
 
                     <div class="card-header">
 
@@ -864,6 +1118,7 @@ $appData = [
                             placeholder="https://example.com/careers"
                         >
 
+
                         <button
                             type="button"
                             id="scrape-career-url"
@@ -880,12 +1135,12 @@ $appData = [
                         class="inline-status"
                     ></div>
 
+
                 </div>
 
 
-                <!-- METRICS -->
-
                 <div class="metrics-grid">
+
 
                     <div class="metric-card">
 
@@ -944,15 +1199,15 @@ $appData = [
 
                     </div>
 
+
                 </div>
 
-
-                <!-- RECOMMENDATION -->
 
                 <div
                     id="recommendation-card"
                     class="content-card recommendation-card"
                 >
+
 
                     <div class="card-header">
 
@@ -975,10 +1230,12 @@ $appData = [
 
                     </div>
 
+
                 </div>
 
 
                 <div class="dashboard-grid">
+
 
                     <div class="content-card">
 
@@ -998,10 +1255,12 @@ $appData = [
 
                         </div>
 
+
                         <canvas
                             id="skills-chart"
                             height="250"
                         ></canvas>
+
 
                     </div>
 
@@ -1024,14 +1283,18 @@ $appData = [
 
                         </div>
 
+
                         <canvas
                             id="readiness-chart"
                             height="250"
                         ></canvas>
 
+
                     </div>
 
+
                 </div>
+
 
             </section>
 
@@ -1044,6 +1307,7 @@ $appData = [
                 id="view-resume"
                 class="view-panel"
             >
+
 
                 <div class="section-header">
 
@@ -1068,29 +1332,36 @@ $appData = [
 
                 <div class="resume-grid">
 
+
                     <div class="content-card">
+
 
                         <form
                             id="form-resume-upload"
                             enctype="multipart/form-data"
                         >
 
+
                             <div
                                 id="resume-drop-zone"
                                 class="resume-drop-zone"
                             >
 
+
                                 <div class="upload-icon">
                                     ↑
                                 </div>
+
 
                                 <h3>
                                     Upload Resume
                                 </h3>
 
+
                                 <p>
                                     PDF or DOCX files supported.
                                 </p>
+
 
                                 <input
                                     type="file"
@@ -1100,6 +1371,7 @@ $appData = [
                                     hidden
                                 >
 
+
                                 <button
                                     type="button"
                                     id="resume-select-button"
@@ -1108,10 +1380,12 @@ $appData = [
                                     Choose Resume
                                 </button>
 
+
                                 <div
                                     id="resume-file-name"
                                     class="file-name"
                                 ></div>
+
 
                             </div>
 
@@ -1124,12 +1398,15 @@ $appData = [
                                 Analyze Resume
                             </button>
 
+
                         </form>
+
 
                     </div>
 
 
                     <div class="content-card ats-card">
+
 
                         <div class="card-header">
 
@@ -1142,6 +1419,7 @@ $appData = [
                             </div>
 
                         </div>
+
 
                         <div class="ats-score-wrapper">
 
@@ -1156,6 +1434,7 @@ $appData = [
 
                         </div>
 
+
                         <div
                             id="ats-feedback"
                             class="ats-feedback"
@@ -1163,12 +1442,15 @@ $appData = [
                             Upload your resume to receive ATS feedback.
                         </div>
 
+
                     </div>
+
 
                 </div>
 
 
                 <div class="content-card">
+
 
                     <div class="card-header">
 
@@ -1185,9 +1467,12 @@ $appData = [
 
                     <div class="contact-grid">
 
+
                         <div>
 
-                            <span>Name</span>
+                            <span>
+                                Name
+                            </span>
 
                             <strong id="resume-name">
                                 <?php echo h($resumeName); ?>
@@ -1198,7 +1483,9 @@ $appData = [
 
                         <div>
 
-                            <span>Email</span>
+                            <span>
+                                Email
+                            </span>
 
                             <strong id="resume-email">
                                 <?php echo h($resumeEmail); ?>
@@ -1209,7 +1496,9 @@ $appData = [
 
                         <div>
 
-                            <span>Phone</span>
+                            <span>
+                                Phone
+                            </span>
 
                             <strong id="resume-phone">
                                 <?php echo h($resumePhone); ?>
@@ -1220,7 +1509,9 @@ $appData = [
 
                         <div>
 
-                            <span>LinkedIn</span>
+                            <span>
+                                LinkedIn
+                            </span>
 
                             <strong id="resume-linkedin">
                                 <?php echo h($resumeLinkedin); ?>
@@ -1231,7 +1522,9 @@ $appData = [
 
                         <div>
 
-                            <span>GitHub</span>
+                            <span>
+                                GitHub
+                            </span>
 
                             <strong id="resume-github">
                                 <?php echo h($resumeGithub); ?>
@@ -1239,12 +1532,15 @@ $appData = [
 
                         </div>
 
+
                     </div>
+
 
                 </div>
 
 
                 <div class="content-card">
+
 
                     <div class="card-header">
 
@@ -1264,27 +1560,37 @@ $appData = [
                         class="skills-list"
                     >
 
+
                         <?php if (!empty($extractedSkills)): ?>
 
+
                             <?php foreach ($extractedSkills as $skill): ?>
+
 
                                 <span class="skill-tag">
                                     <?php echo h($skill); ?>
                                 </span>
 
+
                             <?php endforeach; ?>
 
+
                         <?php else: ?>
+
 
                             <span class="empty-state">
                                 No skills extracted yet.
                             </span>
 
+
                         <?php endif; ?>
+
 
                     </div>
 
+
                 </div>
+
 
             </section>
 
@@ -1297,6 +1603,7 @@ $appData = [
                 id="view-skillgap"
                 class="view-panel"
             >
+
 
                 <div class="section-header">
 
@@ -1321,7 +1628,9 @@ $appData = [
 
                 <div class="two-column-grid">
 
+
                     <div class="content-card">
+
 
                         <div class="card-header">
 
@@ -1330,6 +1639,7 @@ $appData = [
                             </h3>
 
                         </div>
+
 
                         <div
                             id="skillgap-user-skills"
@@ -1342,10 +1652,12 @@ $appData = [
 
                         </div>
 
+
                     </div>
 
 
                     <div class="content-card">
+
 
                         <div class="card-header">
 
@@ -1354,6 +1666,7 @@ $appData = [
                             </h3>
 
                         </div>
+
 
                         <div
                             id="skillgap-required-skills"
@@ -1366,12 +1679,15 @@ $appData = [
 
                         </div>
 
+
                     </div>
+
 
                 </div>
 
 
                 <div class="content-card">
+
 
                     <div class="card-header">
 
@@ -1401,7 +1717,9 @@ $appData = [
 
                     </div>
 
+
                 </div>
+
 
             </section>
 
@@ -1414,6 +1732,7 @@ $appData = [
                 id="view-jobs"
                 class="view-panel"
             >
+
 
                 <div class="section-header">
 
@@ -1438,6 +1757,7 @@ $appData = [
 
                 <div class="content-card">
 
+
                     <div class="career-url-row">
 
                         <input
@@ -1446,6 +1766,7 @@ $appData = [
                             value="<?php echo h($careerUrl); ?>"
                             placeholder="Enter career URL"
                         >
+
 
                         <button
                             type="button"
@@ -1457,6 +1778,7 @@ $appData = [
 
                     </div>
 
+
                 </div>
 
 
@@ -1465,72 +1787,108 @@ $appData = [
                     class="job-results"
                 >
 
+
                     <?php if (!empty($careerJobs)): ?>
+
 
                         <div class="job-table-wrapper">
 
+
                             <table class="job-table">
+
 
                                 <thead>
 
                                     <tr>
-                                        <th>Job Role</th>
-                                        <th>Company</th>
-                                        <th>Location</th>
-                                        <th>Match</th>
-                                        <th>Action</th>
+
+                                        <th>
+                                            Job Role
+                                        </th>
+
+                                        <th>
+                                            Company
+                                        </th>
+
+                                        <th>
+                                            Location
+                                        </th>
+
+                                        <th>
+                                            Match
+                                        </th>
+
+                                        <th>
+                                            Action
+                                        </th>
+
                                     </tr>
 
                                 </thead>
 
+
                                 <tbody>
+
 
                                 <?php foreach ($careerJobs as $job): ?>
 
+
                                     <?php
+
                                     $title =
                                         $job['title']
                                         ?? $job['role']
                                         ?? $job['job_title']
                                         ?? 'Job Opportunity';
 
+
                                     $company =
                                         $job['company']
                                         ?? $job['company_name']
                                         ?? '';
 
+
                                     $location =
                                         $job['location']
                                         ?? '';
+
 
                                     $url =
                                         $job['url']
                                         ?? $job['link']
                                         ?? $job['job_url']
                                         ?? '#';
+
                                     ?>
 
+
                                     <tr>
+
 
                                         <td>
                                             <?php echo h($title); ?>
                                         </td>
 
+
                                         <td>
                                             <?php echo h($company); ?>
                                         </td>
+
 
                                         <td>
                                             <?php echo h($location); ?>
                                         </td>
 
+
                                         <td>
                                             —
                                         </td>
 
+
                                         <td>
 
+
                                             <?php if ($url !== '#'): ?>
+
 
                                                 <a
                                                     href="<?php echo h($url); ?>"
@@ -1541,25 +1899,36 @@ $appData = [
                                                     View Job
                                                 </a>
 
+
                                             <?php else: ?>
 
+
                                                 —
-                                                
+
+
                                             <?php endif; ?>
+
 
                                         </td>
 
+
                                     </tr>
+
 
                                 <?php endforeach; ?>
 
+
                                 </tbody>
+
 
                             </table>
 
+
                         </div>
 
+
                     <?php else: ?>
+
 
                         <div class="empty-state-card">
 
@@ -1573,9 +1942,12 @@ $appData = [
 
                         </div>
 
+
                     <?php endif; ?>
 
+
                 </div>
+
 
             </section>
 
@@ -1588,6 +1960,7 @@ $appData = [
                 id="view-roadmap"
                 class="view-panel"
             >
+
 
                 <div class="section-header">
 
@@ -1635,6 +2008,7 @@ $appData = [
                     class="resources-container"
                 ></div>
 
+
             </section>
 
 
@@ -1646,6 +2020,7 @@ $appData = [
                 id="view-interview"
                 class="view-panel"
             >
+
 
                 <div class="section-header">
 
@@ -1670,6 +2045,7 @@ $appData = [
 
                 <div class="content-card interview-card">
 
+
                     <div
                         id="interview-question"
                         class="interview-question"
@@ -1684,16 +2060,19 @@ $appData = [
                             Your Answer
                         </label>
 
+
                         <textarea
                             id="interview-answer"
                             rows="7"
                             placeholder="Write your answer here..."
                         ></textarea>
 
+
                     </div>
 
 
                     <div class="button-row">
+
 
                         <button
                             type="button"
@@ -1712,6 +2091,7 @@ $appData = [
                             Submit Answer
                         </button>
 
+
                     </div>
 
 
@@ -1720,10 +2100,12 @@ $appData = [
                         class="interview-feedback"
                     ></div>
 
+
                 </div>
 
 
                 <div class="content-card">
+
 
                     <div class="card-header">
 
@@ -1744,11 +2126,13 @@ $appData = [
 
                     <div class="ai-input-row">
 
+
                         <textarea
                             id="input-ai-prompt"
                             rows="3"
                             placeholder="Ask your career question..."
                         ></textarea>
+
 
                         <button
                             type="button"
@@ -1757,6 +2141,7 @@ $appData = [
                         >
                             Ask Assistant
                         </button>
+
 
                     </div>
 
@@ -1775,7 +2160,9 @@ $appData = [
 
                     </div>
 
+
                 </div>
+
 
             </section>
 
@@ -1788,6 +2175,7 @@ $appData = [
                 id="view-report"
                 class="view-panel"
             >
+
 
                 <div class="section-header">
 
@@ -1812,11 +2200,13 @@ $appData = [
 
                 <div class="content-card report-card">
 
+
                     <form
                         id="report-form"
                         method="POST"
                         action="api.php?action=download_pdf"
                     >
+
 
                         <input
                             type="hidden"
@@ -1825,6 +2215,7 @@ $appData = [
                             value="<?php echo h($careerUrl); ?>"
                         >
 
+
                         <button
                             type="submit"
                             class="primary-button"
@@ -1832,9 +2223,12 @@ $appData = [
                             Download Career Report
                         </button>
 
+
                     </form>
 
+
                 </div>
+
 
             </section>
 
@@ -1847,6 +2241,7 @@ $appData = [
                 id="view-profile"
                 class="view-panel"
             >
+
 
                 <div class="section-header">
 
@@ -1871,9 +2266,12 @@ $appData = [
 
                 <div class="content-card">
 
+
                     <form id="profile-form">
 
+
                         <div class="form-row">
+
 
                             <div class="form-group">
 
@@ -1908,10 +2306,12 @@ $appData = [
 
                             </div>
 
+
                         </div>
 
 
                         <div class="form-row">
+
 
                             <div class="form-group">
 
@@ -1944,10 +2344,12 @@ $appData = [
 
                             </div>
 
+
                         </div>
 
 
                         <div class="form-row">
+
 
                             <div class="form-group">
 
@@ -1980,10 +2382,12 @@ $appData = [
 
                             </div>
 
+
                         </div>
 
 
                         <div class="form-row">
+
 
                             <div class="form-group">
 
@@ -2024,6 +2428,7 @@ $appData = [
 
                             </div>
 
+
                         </div>
 
 
@@ -2040,18 +2445,24 @@ $appData = [
                             class="inline-status"
                         ></div>
 
+
                     </form>
 
+
                 </div>
+
 
             </section>
 
 
         </div>
 
+
     </main>
 
+
 </div>
+
 
 <?php endif; ?>
 
@@ -2060,7 +2471,11 @@ $appData = [
      JAVASCRIPT
      ============================================================ -->
 
-<script src="static/app.js?v=<?php echo time(); ?>"></script>
+<script
+    src="static/app.js?v=<?php echo time(); ?>"
+></script>
+
 
 </body>
+
 </html>
