@@ -9,17 +9,18 @@ session_start();
 
 require_once __DIR__ . '/db.php';
 
-$user = $_SESSION['user'] ?? null;
-
-/*
-|--------------------------------------------------------------------------
-| Safe helpers
-|--------------------------------------------------------------------------
-*/
+/* ================================================================
+   HELPERS
+================================================================ */
 
 function h($value)
 {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+}
+
+function safeArray($value)
+{
+    return is_array($value) ? $value : [];
 }
 
 function formatSocialUrl($url)
@@ -30,138 +31,105 @@ function formatSocialUrl($url)
 
     $url = trim($url);
 
-    if (
-        stripos($url, 'summary') !== false ||
-        stripos($url, 'experience') !== false ||
-        stripos($url, 'education') !== false ||
-        stripos($url, 'skills') !== false ||
-        stripos($url, 'projects') !== false ||
-        stripos($url, 'certifications') !== false
-    ) {
+    if ($url === '') {
         return null;
     }
 
-    if (preg_match('/^https?:\/\//i', $url)) {
+    $lower = strtolower($url);
+
+    $invalidParts = [
+        'summary',
+        'experience',
+        'education',
+        'skills',
+        'projects',
+        'certifications',
+        'about',
+        'contact',
+        'home'
+    ];
+
+    foreach ($invalidParts as $part) {
+        if (strpos($lower, $part) !== false) {
+            return null;
+        }
+    }
+
+    if (
+        strpos($url, 'http://') === 0 ||
+        strpos($url, 'https://') === 0
+    ) {
         return $url;
     }
 
     return 'https://' . ltrim($url, '/');
 }
 
-/*
-|--------------------------------------------------------------------------
-| Dynamic session data
-|--------------------------------------------------------------------------
-*/
+/* ================================================================
+   SESSION
+================================================================ */
+
+$user = $_SESSION['user'] ?? null;
 
 $careerUrl = $_SESSION['career_url'] ?? '';
 
 $targetCompany = $_SESSION['target_company'] ?? '';
 $targetRole = $_SESSION['target_role'] ?? '';
 
-$requiredSkills = $_SESSION['required_skills'] ?? [];
-$extractedSkills = $_SESSION['extracted_skills'] ?? [];
+$requiredSkills = safeArray(
+    $_SESSION['required_skills'] ?? []
+);
+
+$extractedSkills = safeArray(
+    $_SESSION['extracted_skills'] ?? []
+);
 
 $atsScore = $_SESSION['ats_score'] ?? 0;
 
 $recommendedJob = $_SESSION['recommended_job'] ?? null;
 
-$careerJobs = $_SESSION['career_jobs'] ?? [];
+$careerJobs = safeArray(
+    $_SESSION['career_jobs'] ?? []
+);
 
-if (!is_array($requiredSkills)) {
-    $requiredSkills = [];
-}
+/* ================================================================
+   PARSED RESUME
+================================================================ */
 
-if (!is_array($extractedSkills)) {
-    $extractedSkills = [];
-}
+$parsedResume = safeArray(
+    $_SESSION['parsed_resume'] ?? []
+);
 
-if (!is_array($careerJobs)) {
-    $careerJobs = [];
-}
+$contactInfo = safeArray(
+    $parsedResume['contact_info'] ?? []
+);
 
-/*
-|--------------------------------------------------------------------------
-| Canonical skills
-|
-| These are only used for optional UI skill editing.
-| They are NOT companies or job roles.
-|--------------------------------------------------------------------------
-*/
+$detectedName =
+    $contactInfo['name']
+    ?? ($user['name'] ?? '');
 
-$canonicalSkills = [
-    "Python",
-    "Java",
-    "C++",
-    "C#",
-    "SQL",
-    "JavaScript",
-    "TypeScript",
-    "HTML/CSS",
-    "React",
-    "Node.js",
-    "Django",
-    "Flask",
-    "Pandas",
-    "NumPy",
-    "Scikit-Learn",
-    "TensorFlow",
-    "PyTorch",
-    "Data Structures",
-    "Algorithms",
-    "System Design",
-    "Git",
-    "Docker",
-    "Kubernetes",
-    "AWS",
-    "Google Cloud Platform",
-    "Azure",
-    "Linux",
-    "REST APIs",
-    "Computer Networks",
-    "Cyber Security",
-    "Networking",
-    "MySQL",
-    "PostgreSQL",
-    "MongoDB"
-];
+$detectedEmail =
+    $contactInfo['email']
+    ?? ($user['email'] ?? '');
 
-/*
-|--------------------------------------------------------------------------
-| Parsed resume information
-|--------------------------------------------------------------------------
-*/
+$detectedPhone =
+    $contactInfo['phone']
+    ?? '';
 
-$parsedResume = $_SESSION['parsed_resume'] ?? [];
-
-if (!is_array($parsedResume)) {
-    $parsedResume = [];
-}
-
-$contactInfo = $parsedResume['contact_info'] ?? [];
-
-if (!is_array($contactInfo)) {
-    $contactInfo = [];
-}
-
-$detectedName = $contactInfo['name'] ?? ($user['name'] ?? '');
-$detectedEmail = $contactInfo['email'] ?? ($user['email'] ?? '');
-$detectedPhone = $contactInfo['phone'] ?? '';
-
-$detectedLinkedin = $contactInfo['linkedin']
+$detectedLinkedin =
+    $contactInfo['linkedin']
     ?? ($user['linkedin'] ?? '');
 
-$detectedGithub = $contactInfo['github']
+$detectedGithub =
+    $contactInfo['github']
     ?? ($user['github'] ?? '');
 
 $linkedinUrl = formatSocialUrl($detectedLinkedin);
 $githubUrl = formatSocialUrl($detectedGithub);
 
-/*
-|--------------------------------------------------------------------------
-| Resume history
-|--------------------------------------------------------------------------
-*/
+/* ================================================================
+   RESUME HISTORY
+================================================================ */
 
 $resumeHistory = [];
 
@@ -177,22 +145,26 @@ if ($user && !empty($user['id'])) {
     }
 }
 
-/*
-|--------------------------------------------------------------------------
-| JSON-safe application data
-|--------------------------------------------------------------------------
-*/
+/* ================================================================
+   APPLICATION DATA
+================================================================ */
 
 $appData = [
     'loggedIn' => (bool)$user,
     'user' => $user,
+
     'careerUrl' => $careerUrl,
+
     'targetCompany' => $targetCompany,
     'targetRole' => $targetRole,
+
     'requiredSkills' => $requiredSkills,
     'extractedSkills' => $extractedSkills,
+
     'atsScore' => $atsScore,
+
     'recommendedJob' => $recommendedJob,
+
     'careerJobs' => $careerJobs
 ];
 
@@ -220,44 +192,36 @@ $appData = [
 
     <link
         rel="stylesheet"
-        href="static/styles.css"
+        href="static/styles.css?v=<?php echo time(); ?>"
     >
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <script>
-        window.APP_DATA =
-            <?php echo json_encode(
-                $appData,
-                JSON_UNESCAPED_SLASHES |
-                JSON_UNESCAPED_UNICODE
-            ); ?>;
-
-        window.CANONICAL_SKILLS =
-            <?php echo json_encode(
-                $canonicalSkills,
-                JSON_UNESCAPED_SLASHES |
-                JSON_UNESCAPED_UNICODE
-            ); ?>;
-    </script>
 
 </head>
 
 <body>
 
-<!-- ============================================================= -->
-<!-- PAGE LOADER -->
-<!-- ============================================================= -->
+<!-- ================================================================
+     PAGE LOADER
+================================================================ -->
 
 <div
     id="page-loader"
-    aria-hidden="true"
+    class="page-loader"
 >
 
-    <div class="loader-ring"></div>
+    <div class="loader-card">
 
-    <div class="loader-text">
-        Loading Skill-Gap Predictor...
+        <div class="loader-ring"></div>
+
+        <div class="loader-title">
+            Skill-Gap Predictor
+        </div>
+
+        <div class="loader-text">
+            Loading Career Navigation AI...
+        </div>
+
     </div>
 
 </div>
@@ -265,152 +229,186 @@ $appData = [
 
 <?php if (!$user): ?>
 
-<!-- ============================================================= -->
-<!-- AUTHENTICATION SCREEN -->
-<!-- ============================================================= -->
+<!-- ================================================================
+     AUTHENTICATION SCREEN
+================================================================ -->
 
 <section
     id="auth-screen"
-    class="auth-screen auth-wrapper"
+    class="auth-screen"
 >
 
-    <div class="auth-card">
+    <div class="auth-container">
 
-        <!-- Header -->
+        <!-- BRAND -->
 
-        <div
-            class="main-header-banner"
-            style="text-align:center;padding:24px;"
-        >
+        <div class="auth-brand">
 
-            <span class="student-badge">
-                🎓 Student Career Intelligence Portal
-            </span>
-
-            <h1
-                class="header-title"
-                style="font-size:24px;"
-            >
-                Skill-Gap Predictor
-            </h1>
-
-            <p
-                class="header-subtitle"
-                style="font-size:13px;"
-            >
-                Career Navigation AI for Students
-            </p>
-
-        </div>
-
-
-        <!-- ===================================================== -->
-        <!-- AUTH TABS -->
-        <!-- ===================================================== -->
-
-        <div class="auth-tabs">
-
-            <div
-                class="auth-tab active"
-                id="tab-btn-login"
-                data-auth-tab="login"
-                role="button"
-                tabindex="0"
-            >
-                🔐 Student Login
+            <div class="auth-brand-icon">
+                🎓
             </div>
 
-            <div
-                class="auth-tab"
-                id="tab-btn-signup"
-                data-auth-tab="signup"
-                role="button"
-                tabindex="0"
-            >
-                📝 Create Account
+            <div>
+
+                <div class="auth-brand-title">
+                    Skill-Gap Predictor
+                </div>
+
+                <div class="auth-brand-subtitle">
+                    Career Navigation AI
+                </div>
+
             </div>
 
         </div>
 
 
-        <!-- ===================================================== -->
-        <!-- LOGIN -->
-        <!-- ===================================================== -->
+        <!-- AUTH CARD -->
 
-        <div
-            id="form-login-box"
-            data-auth-panel="login"
-        >
+        <div class="auth-card">
 
-            <div
-                id="login-error-msg"
-                class="alert alert-error"
-                style="display:none;"
-            ></div>
+            <div class="auth-heading">
 
-            <div
-                id="login-success-msg"
-                class="alert alert-success"
-                style="display:none;"
-            ></div>
+                <span class="auth-badge">
+                    Student Career Intelligence
+                </span>
+
+                <h1>
+                    Build Your Career Path
+                </h1>
+
+                <p>
+                    Analyze your resume, discover skill gaps,
+                    and match yourself with real career opportunities.
+                </p>
+
+            </div>
 
 
-            <div class="form-group">
+            <!-- ====================================================
+                 AUTH TABS
+            ==================================================== -->
 
-                <label class="form-label">
-                    University / Student Email
-                </label>
+            <div class="auth-tabs">
 
-                <input
-                    type="email"
-                    id="login_email"
-                    name="email"
-                    class="form-control"
-                    placeholder="Enter your email address"
-                    autocomplete="email"
+                <button
+                    type="button"
+                    id="tab-btn-login"
+                    class="auth-tab active"
+                    data-auth-tab="login"
                 >
+                    Login
+                </button>
+
+                <button
+                    type="button"
+                    id="tab-btn-signup"
+                    class="auth-tab"
+                    data-auth-tab="signup"
+                >
+                    Create Account
+                </button>
 
             </div>
 
 
-            <div class="form-group">
+            <!-- ====================================================
+                 LOGIN
+            ==================================================== -->
 
-                <label class="form-label">
-                    Password
-                </label>
+            <div
+                id="form-login-box"
+                class="auth-panel"
+                data-auth-panel="login"
+            >
 
                 <div
-                    style="
-                        position:relative;
-                        display:flex;
-                        align-items:center;
-                    "
-                >
+                    id="login-error-msg"
+                    class="alert alert-error"
+                    style="display:none;"
+                ></div>
+
+                <div
+                    id="login-success-msg"
+                    class="alert alert-success"
+                    style="display:none;"
+                ></div>
+
+
+                <div class="form-group">
+
+                    <label
+                        for="login_email"
+                        class="form-label"
+                    >
+                        Email Address
+                    </label>
 
                     <input
-                        type="password"
-                        id="login_password"
-                        name="password"
+                        type="email"
+                        id="login_email"
+                        name="login_email"
                         class="form-control"
-                        placeholder="Enter your password"
-                        autocomplete="current-password"
-                        style="padding-right:48px;"
+                        placeholder="Enter your email"
+                        autocomplete="email"
                     >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label
+                        for="login_password"
+                        class="form-label"
+                    >
+                        Password
+                    </label>
+
+                    <div class="password-field">
+
+                        <input
+                            type="password"
+                            id="login_password"
+                            name="login_password"
+                            class="form-control"
+                            placeholder="Enter your password"
+                            autocomplete="current-password"
+                        >
+
+                        <button
+                            type="button"
+                            id="toggle-login-password"
+                            class="password-toggle"
+                            aria-label="Show password"
+                        >
+                            👁
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    id="btn-do-login"
+                    class="btn btn-primary btn-block"
+                >
+                    Login to Dashboard
+                </button>
+
+
+                <div class="auth-switch">
+
+                    Don't have an account?
 
                     <button
                         type="button"
-                        id="toggle-login-password"
-                        aria-label="Show password"
-                        style="
-                            position:absolute;
-                            right:10px;
-                            border:none;
-                            background:none;
-                            cursor:pointer;
-                            font-size:18px;
-                        "
+                        id="create-account-link"
+                        class="auth-link"
                     >
-                        👁️
+                        Create Account
                     </button>
 
                 </div>
@@ -418,324 +416,307 @@ $appData = [
             </div>
 
 
-            <button
-                type="button"
-                id="btn-do-login"
-                class="btn btn-block"
-            >
-                🚀 Log In to My Dashboard
-            </button>
-
-
-            <p
-                style="
-                    font-size:12px;
-                    color:var(--text-subtle);
-                    margin-top:14px;
-                    text-align:center;
-                "
-            >
-                New student?
-                <a
-                    href="#"
-                    id="create-account-link"
-                    class="create-account-link"
-                >
-                    Create an account
-                </a>
-            </p>
-
-        </div>
-
-
-        <!-- ===================================================== -->
-        <!-- CREATE ACCOUNT -->
-        <!-- ===================================================== -->
-
-        <div
-            id="form-signup-box"
-            data-auth-panel="signup"
-            style="display:none;"
-        >
+            <!-- ====================================================
+                 CREATE ACCOUNT
+            ==================================================== -->
 
             <div
-                id="signup-error-msg"
-                class="alert alert-error"
+                id="form-signup-box"
+                class="auth-panel"
+                data-auth-panel="signup"
                 style="display:none;"
-            ></div>
-
-            <div
-                id="signup-success-msg"
-                class="alert alert-success"
-                style="display:none;"
-            ></div>
-
-
-            <div class="form-group">
-
-                <label class="form-label">
-                    Full Name *
-                </label>
-
-                <input
-                    type="text"
-                    id="signup_name"
-                    name="name"
-                    class="form-control"
-                    placeholder="Enter your full name"
-                    autocomplete="name"
-                >
-
-            </div>
-
-
-            <div class="form-group">
-
-                <label class="form-label">
-                    Email Address *
-                </label>
-
-                <input
-                    type="email"
-                    id="signup_email"
-                    name="email"
-                    class="form-control"
-                    placeholder="Enter your email address"
-                    autocomplete="email"
-                >
-
-            </div>
-
-
-            <div class="form-group">
-
-                <label class="form-label">
-                    Create Password *
-                </label>
+            >
 
                 <div
-                    style="
-                        position:relative;
-                        display:flex;
-                        align-items:center;
-                    "
-                >
+                    id="signup-error-msg"
+                    class="alert alert-error"
+                    style="display:none;"
+                ></div>
+
+                <div
+                    id="signup-success-msg"
+                    class="alert alert-success"
+                    style="display:none;"
+                ></div>
+
+
+                <div class="form-group">
+
+                    <label
+                        for="signup_name"
+                        class="form-label"
+                    >
+                        Full Name *
+                    </label>
 
                     <input
-                        type="password"
-                        id="signup_pwd"
-                        name="password"
+                        type="text"
+                        id="signup_name"
+                        name="signup_name"
                         class="form-control"
-                        placeholder="Create a password"
-                        autocomplete="new-password"
-                        style="padding-right:48px;"
+                        placeholder="Enter your full name"
+                        autocomplete="name"
                     >
-
-                    <button
-                        type="button"
-                        id="toggle-signup-password"
-                        aria-label="Show password"
-                        style="
-                            position:absolute;
-                            right:10px;
-                            border:none;
-                            background:none;
-                            cursor:pointer;
-                            font-size:18px;
-                        "
-                    >
-                        👁️
-                    </button>
 
                 </div>
 
-                <small
-                    style="
-                        display:block;
-                        margin-top:6px;
-                        color:var(--text-muted);
-                    "
-                >
-                    Use at least 4 characters.
-                </small>
 
-            </div>
+                <div class="form-group">
 
+                    <label
+                        for="signup_email"
+                        class="form-label"
+                    >
+                        Email Address *
+                    </label>
 
-            <div class="form-group">
+                    <input
+                        type="email"
+                        id="signup_email"
+                        name="signup_email"
+                        class="form-control"
+                        placeholder="Enter your email"
+                        autocomplete="email"
+                    >
 
-                <label class="form-label">
-                    University / College
-                </label>
-
-                <input
-                    type="text"
-                    id="signup_uni"
-                    name="university"
-                    class="form-control"
-                    placeholder="Enter your university or college"
-                >
-
-            </div>
+                </div>
 
 
-            <div class="form-group">
+                <div class="form-group">
 
-                <label class="form-label">
-                    Branch / Degree
-                </label>
+                    <label
+                        for="signup_pwd"
+                        class="form-label"
+                    >
+                        Password *
+                    </label>
 
-                <input
-                    type="text"
-                    id="signup_branch"
-                    name="branch"
-                    class="form-control"
-                    placeholder="e.g. Computer Science & Engineering"
-                >
+                    <div class="password-field">
 
-            </div>
+                        <input
+                            type="password"
+                            id="signup_pwd"
+                            name="signup_pwd"
+                            class="form-control"
+                            placeholder="Create a password"
+                            autocomplete="new-password"
+                        >
+
+                        <button
+                            type="button"
+                            id="toggle-signup-password"
+                            class="password-toggle"
+                            aria-label="Show password"
+                        >
+                            👁
+                        </button>
+
+                    </div>
+
+                    <div class="form-help">
+                        Use at least 4 characters.
+                    </div>
+
+                </div>
 
 
-            <div class="form-group">
+                <div class="form-group">
 
-                <label class="form-label">
-                    Specialization / Major
-                </label>
+                    <label
+                        for="signup_uni"
+                        class="form-label"
+                    >
+                        University / College
+                    </label>
 
-                <input
-                    type="text"
-                    id="signup_major"
-                    name="major"
-                    class="form-control"
-                    placeholder="e.g. Cyber Security"
-                >
+                    <input
+                        type="text"
+                        id="signup_uni"
+                        name="signup_uni"
+                        class="form-control"
+                        placeholder="Enter your university"
+                    >
 
-            </div>
+                </div>
 
 
-            <div class="form-group">
+                <div class="form-row">
 
-                <label class="form-label">
-                    Graduation Year
-                </label>
+                    <div class="form-group">
 
-                <select
-                    id="signup_gradyear"
-                    name="graduation_year"
-                    class="form-control"
-                >
+                        <label
+                            for="signup_branch"
+                            class="form-label"
+                        >
+                            Branch / Degree
+                        </label>
 
-                    <option value="">
-                        Select graduation year
-                    </option>
+                        <input
+                            type="text"
+                            id="signup_branch"
+                            name="signup_branch"
+                            class="form-control"
+                            placeholder="e.g. CSE"
+                        >
 
-                    <?php for ($year = date('Y') - 2; $year <= date('Y') + 7; $year++): ?>
+                    </div>
 
-                        <option value="<?php echo $year; ?>">
-                            <?php echo $year; ?>
+
+                    <div class="form-group">
+
+                        <label
+                            for="signup_major"
+                            class="form-label"
+                        >
+                            Specialization
+                        </label>
+
+                        <input
+                            type="text"
+                            id="signup_major"
+                            name="signup_major"
+                            class="form-control"
+                            placeholder="e.g. Cyber Security"
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label
+                        for="signup_gradyear"
+                        class="form-label"
+                    >
+                        Graduation Year
+                    </label>
+
+                    <select
+                        id="signup_gradyear"
+                        name="signup_gradyear"
+                        class="form-control"
+                    >
+
+                        <option value="">
+                            Select graduation year
                         </option>
 
-                    <?php endfor; ?>
+                        <?php
+                        $currentYear = (int)date('Y');
 
-                </select>
+                        for (
+                            $year = $currentYear - 2;
+                            $year <= $currentYear + 7;
+                            $year++
+                        ):
+                        ?>
 
-            </div>
+                            <option value="<?php echo $year; ?>">
+                                <?php echo $year; ?>
+                            </option>
 
+                        <?php endfor; ?>
 
-            <div class="form-group">
+                    </select>
 
-                <label class="form-label">
-                    LinkedIn Profile
-                </label>
-
-                <input
-                    type="text"
-                    id="signup_linkedin"
-                    name="linkedin"
-                    class="form-control"
-                    placeholder="https://linkedin.com/in/your-profile"
-                >
-
-            </div>
+                </div>
 
 
-            <div class="form-group">
+                <div class="form-row">
 
-                <label class="form-label">
-                    GitHub Profile
-                </label>
+                    <div class="form-group">
 
-                <input
-                    type="text"
-                    id="signup_github"
-                    name="github"
-                    class="form-control"
-                    placeholder="https://github.com/your-profile"
-                >
+                        <label
+                            for="signup_linkedin"
+                            class="form-label"
+                        >
+                            LinkedIn
+                        </label>
 
-            </div>
+                        <input
+                            type="text"
+                            id="signup_linkedin"
+                            name="signup_linkedin"
+                            class="form-control"
+                            placeholder="LinkedIn URL"
+                        >
+
+                    </div>
 
 
-            <div
-                class="form-group"
-                style="margin-top:12px;"
-            >
+                    <div class="form-group">
 
-                <label
-                    style="
-                        display:flex;
-                        gap:8px;
-                        align-items:flex-start;
-                        font-size:13px;
-                        cursor:pointer;
-                    "
-                >
+                        <label
+                            for="signup_github"
+                            class="form-label"
+                        >
+                            GitHub
+                        </label>
+
+                        <input
+                            type="text"
+                            id="signup_github"
+                            name="signup_github"
+                            class="form-control"
+                            placeholder="GitHub URL"
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <div class="terms-row">
 
                     <input
                         type="checkbox"
                         id="signup-terms"
                     >
 
-                    <span>
-                        I confirm that the information provided is
-                        accurate and I agree to use this portal for
-                        career preparation.
-                    </span>
+                    <label for="signup-terms">
 
-                </label>
+                        I confirm that the information provided
+                        is accurate.
+
+                    </label>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    id="btn-do-signup"
+                    class="btn btn-primary btn-block"
+                >
+                    Create My Account
+                </button>
+
+
+                <div class="auth-switch">
+
+                    Already have an account?
+
+                    <button
+                        type="button"
+                        id="back-to-login"
+                        class="auth-link"
+                    >
+                        Login here
+                    </button>
+
+                </div>
 
             </div>
 
-
-            <button
-                type="button"
-                id="btn-do-signup"
-                class="btn btn-block"
-            >
-                ✨ Create My Account
-            </button>
+        </div>
 
 
-            <p
-                style="
-                    font-size:12px;
-                    color:var(--text-subtle);
-                    margin-top:14px;
-                    text-align:center;
-                "
-            >
+        <div class="auth-footer">
 
-                Already have an account?
-
-                <a
-                    href="#"
-                    id="back-to-login"
-                    class="back-to-login"
-                >
-                    Login here
-                </a>
-
-            </p>
+            Your career URL and resume analysis are available
+            after login.
 
         </div>
 
@@ -746,147 +727,107 @@ $appData = [
 
 <?php else: ?>
 
-<!-- ============================================================= -->
-<!-- LOGGED-IN APPLICATION -->
-<!-- ============================================================= -->
+<!-- ================================================================
+     APPLICATION
+================================================================ -->
 
 <div
     id="dashboard-app"
-    class="dashboard-app"
+    class="app-shell"
 >
 
 
-    <!-- ========================================================= -->
-    <!-- MOBILE SIDEBAR OVERLAY -->
-    <!-- ========================================================= -->
+    <!-- ============================================================
+         MOBILE OVERLAY
+    ============================================================ -->
 
     <div
         id="sidebar-overlay"
         class="sidebar-overlay"
-        style="display:none;"
     ></div>
 
 
-    <!-- ========================================================= -->
-    <!-- SIDEBAR -->
-    <!-- ========================================================= -->
+    <!-- ============================================================
+         SIDEBAR
+    ============================================================ -->
 
     <aside
         id="app-sidebar"
-        class="sidebar"
+        class="app-sidebar"
     >
 
-        <div
-            style="
-                display:flex;
-                justify-content:flex-end;
-                margin-bottom:10px;
-            "
-        >
+        <!-- SIDEBAR BRAND -->
+
+        <div class="sidebar-brand">
+
+            <div class="sidebar-brand-icon">
+                🎓
+            </div>
+
+            <div>
+
+                <div class="sidebar-brand-title">
+                    Skill-Gap
+                </div>
+
+                <div class="sidebar-brand-subtitle">
+                    Career AI
+                </div>
+
+            </div>
 
             <button
                 type="button"
                 id="sidebar-close"
-                class="btn btn-secondary"
-                style="
-                    padding:5px 10px;
-                    font-size:12px;
-                "
+                class="sidebar-close"
             >
-                ✕
+                ×
             </button>
 
         </div>
 
 
-        <!-- USER CARD -->
+        <!-- USER -->
 
-        <div class="sidebar-user-card">
+        <div class="sidebar-user">
 
-            <div
-                style="
-                    font-size:28px;
-                    margin-bottom:6px;
-                "
-            >
-                👤
+            <div class="sidebar-avatar">
+                <?php
+                $userName = trim($user['name'] ?? 'Student');
+                echo h(
+                    strtoupper(
+                        substr($userName, 0, 1)
+                    )
+                );
+                ?>
             </div>
 
-            <div
-                style="
-                    font-weight:800;
-                    color:#ffffff;
-                    font-size:16px;
-                "
-            >
-                <?php echo h($user['name'] ?? 'Student'); ?>
-            </div>
+            <div class="sidebar-user-info">
 
-            <div
-                style="
-                    font-size:12px;
-                    color:var(--text-muted);
-                    margin-top:3px;
-                "
-            >
-                <?php echo h($user['email'] ?? ''); ?>
-            </div>
+                <strong>
+                    <?php echo h($userName); ?>
+                </strong>
 
-            <div
-                style="
-                    font-size:11px;
-                    color:var(--cyan-light);
-                    font-weight:600;
-                    margin-top:5px;
-                "
-            >
-                <?php echo h($user['branch'] ?? 'Student'); ?>
+                <span>
+                    <?php echo h($user['email'] ?? ''); ?>
+                </span>
+
             </div>
 
         </div>
 
 
-        <!-- ===================================================== -->
         <!-- CAREER TARGET -->
-        <!-- ===================================================== -->
 
-        <div
-            style="
-                margin-top:22px;
-                margin-bottom:22px;
-            "
-        >
+        <div class="sidebar-target">
 
-            <label
-                class="form-label"
-                style="color:var(--cyan-light);"
-            >
-                🎯 Career Target
-            </label>
-
-
-            <p
-                style="
-                    font-size:12px;
-                    color:var(--text-muted);
-                    line-height:1.5;
-                    margin-bottom:10px;
-                "
-            >
-                Enter a career/jobs URL after logging in.
-                The application will analyze jobs from that
-                source dynamically.
-            </p>
-
+            <div class="sidebar-section-label">
+                CAREER TARGET
+            </div>
 
             <div
                 id="sidebar-target-summary"
-                style="
-                    padding:10px;
-                    border-radius:8px;
-                    background:rgba(15,23,42,.65);
-                    font-size:12px;
-                "
+                class="sidebar-target-box"
             >
 
                 <?php if ($targetCompany || $targetRole): ?>
@@ -897,8 +838,6 @@ $appData = [
 
                     <?php if ($targetRole): ?>
 
-                        <br>
-
                         <span>
                             <?php echo h($targetRole); ?>
                         </span>
@@ -907,8 +846,8 @@ $appData = [
 
                 <?php else: ?>
 
-                    <span style="color:var(--text-muted);">
-                        No career target selected yet.
+                    <span class="muted">
+                        No target selected
                     </span>
 
                 <?php endif; ?>
@@ -918,107 +857,127 @@ $appData = [
         </div>
 
 
-        <!-- ===================================================== -->
         <!-- NAVIGATION -->
-        <!-- ===================================================== -->
 
-        <nav class="nav-menu">
+        <nav class="sidebar-nav">
 
-            <a
-                href="#"
+            <button
+                type="button"
                 class="nav-item active"
                 data-view="view-analytics"
             >
-                📊 Dashboard
-            </a>
+                <span class="nav-icon">📊</span>
+                <span>Dashboard</span>
+            </button>
 
-            <a
-                href="#"
+
+            <button
+                type="button"
                 class="nav-item"
                 data-view="view-resume"
             >
-                📄 Resume Parser & ATS
-            </a>
+                <span class="nav-icon">📄</span>
+                <span>Resume Parser & ATS</span>
+            </button>
 
-            <a
-                href="#"
+
+            <button
+                type="button"
                 class="nav-item"
                 data-view="view-skillgap"
             >
-                🎯 Skill-Gap Predictor
-            </a>
+                <span class="nav-icon">🎯</span>
+                <span>Skill-Gap Predictor</span>
+            </button>
 
-            <a
-                href="#"
+
+            <button
+                type="button"
                 class="nav-item"
                 data-view="view-jobranking"
             >
-                💼 Dynamic Job Ranking
-            </a>
+                <span class="nav-icon">💼</span>
+                <span>Dynamic Job Ranking</span>
+            </button>
 
-            <a
-                href="#"
+
+            <button
+                type="button"
                 class="nav-item"
                 data-view="view-roadmap"
             >
-                🗺️ Career Roadmap
-            </a>
+                <span class="nav-icon">🗺️</span>
+                <span>Career Roadmap</span>
+            </button>
 
-            <a
-                href="#"
+
+            <button
+                type="button"
                 class="nav-item"
                 data-view="view-interview"
             >
-                🎙️ Interview Prep
-            </a>
+                <span class="nav-icon">🎙️</span>
+                <span>Interview Prep</span>
+            </button>
 
-            <a
-                href="#"
+
+            <button
+                type="button"
                 class="nav-item"
                 data-view="view-report"
             >
-                📑 Download Report
-            </a>
+                <span class="nav-icon">📑</span>
+                <span>Download Report</span>
+            </button>
 
-            <a
-                href="#"
+
+            <button
+                type="button"
                 class="nav-item"
                 data-view="view-profile"
             >
-                👤 Profile
-            </a>
+                <span class="nav-icon">👤</span>
+                <span>Profile</span>
+            </button>
 
         </nav>
 
 
-        <!-- ===================================================== -->
-        <!-- SIDEBAR ACTIONS -->
-        <!-- ===================================================== -->
+        <!-- SIDEBAR FOOTER -->
 
-        <div
-            style="
-                margin-top:auto;
-                padding-top:20px;
-            "
-        >
+        <div class="sidebar-footer">
 
             <button
                 type="button"
                 id="theme-toggle"
-                class="btn btn-secondary btn-block"
+                class="sidebar-action"
             >
-                <span id="theme-icon">🌙</span>
-                <span id="theme-text">Dark</span>
+
+                <span id="theme-icon">
+                    🌙
+                </span>
+
+                <span id="theme-text">
+                    Dark Mode
+                </span>
+
             </button>
 
 
             <button
                 type="button"
                 id="logout-button"
-                class="btn btn-secondary btn-block"
-                style="margin-top:10px;"
+                class="sidebar-action logout-action"
             >
-                🚪 Log Out
+
+                <span>
+                    🚪
+                </span>
+
+                <span>
+                    Logout
+                </span>
+
             </button>
 
         </div>
@@ -1026,229 +985,237 @@ $appData = [
     </aside>
 
 
-    <!-- ========================================================= -->
-    <!-- MAIN -->
-    <!-- ========================================================= -->
+    <!-- ============================================================
+         MAIN AREA
+    ============================================================ -->
 
-    <main class="main-content">
-
-
-        <!-- ===================================================== -->
-        <!-- MOBILE / TOP BAR -->
-        <!-- ===================================================== -->
-
-        <div
-            style="
-                display:flex;
-                justify-content:space-between;
-                align-items:center;
-                margin-bottom:18px;
-                gap:10px;
-            "
-        >
-
-            <button
-                type="button"
-                id="mobile-menu-toggle"
-                class="btn btn-secondary"
-            >
-                ☰ Menu
-            </button>
+    <main class="main-area">
 
 
-            <button
-                type="button"
-                id="top-theme-toggle"
-                class="btn btn-secondary"
-            >
-                🌙 Theme
-            </button>
+        <!-- TOP BAR -->
 
-        </div>
+        <header class="topbar">
 
+            <div class="topbar-left">
 
-        <!-- ===================================================== -->
-        <!-- HEADER -->
-        <!-- ===================================================== -->
+                <button
+                    type="button"
+                    id="mobile-menu-toggle"
+                    class="menu-button"
+                >
+                    ☰
+                </button>
 
-        <div class="main-header-banner">
+                <div>
 
-            <span class="student-badge">
-                ⚡ Career Navigation AI —
-                <?php echo h($user['name'] ?? 'Student'); ?>
-            </span>
+                    <div class="topbar-title">
+                        Career Navigation AI
+                    </div>
 
-
-            <h1
-                class="header-title"
-                id="banner-company-role"
-            >
-
-                <?php if ($targetCompany || $targetRole): ?>
-
-                    <?php echo h($targetCompany); ?>
-
-                    <?php if ($targetCompany && $targetRole): ?>
-                        ·
-                    <?php endif; ?>
-
-                    <?php echo h($targetRole); ?>
-
-                <?php else: ?>
-
-                    Career Target Not Selected
-
-                <?php endif; ?>
-
-            </h1>
-
-
-            <p class="header-subtitle">
-
-                Analyze your resume, identify skill gaps,
-                compare your skills with live job requirements,
-                and build a personalized career roadmap.
-
-            </p>
-
-        </div>
-
-
-        <!-- ===================================================== -->
-        <!-- VIEW 1 : DASHBOARD -->
-        <!-- ===================================================== -->
-
-        <section
-            id="view-analytics"
-            class="view-panel"
-        >
-
-            <div class="metrics-grid">
-
-
-                <div class="metric-card-container">
-
-                    <span class="metric-label">
-                        ATS Score
-                    </span>
-
-                    <span
-                        class="metric-value"
-                        id="metric-ats"
-                    >
-                        <?php echo h($atsScore); ?> / 100
-                    </span>
-
-                    <span class="metric-subtext">
-                        Based on your uploaded resume
-                    </span>
-
-                </div>
-
-
-                <div class="metric-card-container">
-
-                    <span class="metric-label">
-                        Job Readiness
-                    </span>
-
-                    <span
-                        class="metric-value"
-                        id="metric-readiness"
-                    >
-                        0%
-                    </span>
-
-                    <span
-                        class="metric-subtext"
-                        id="metric-matched-count"
-                    >
-                        Awaiting career target
-                    </span>
-
-                </div>
-
-
-                <div class="metric-card-container">
-
-                    <span class="metric-label">
-                        AI Confidence
-                    </span>
-
-                    <span
-                        class="metric-value"
-                        id="metric-confidence"
-                    >
-                        0%
-                    </span>
-
-                    <span class="metric-subtext">
-                        Dynamic analysis confidence
-                    </span>
-
-                </div>
-
-
-                <div class="metric-card-container">
-
-                    <span class="metric-label">
-                        Resume Strength
-                    </span>
-
-                    <span
-                        class="metric-value"
-                        id="metric-strength"
-                    >
-                        Not Evaluated
-                    </span>
-
-                    <span class="metric-subtext">
-                        Based on ATS analysis
-                    </span>
+                    <div class="topbar-subtitle">
+                        Skill-Gap Predictor
+                    </div>
 
                 </div>
 
             </div>
 
 
-            <!-- ================================================= -->
-            <!-- CAREER URL -->
-            <!-- ================================================= -->
-
-            <div
-                class="section-panel"
-                style="margin-top:24px;"
+            <button
+                type="button"
+                id="top-theme-toggle"
+                class="theme-button"
             >
 
-                <h3
-                    style="
-                        color:var(--cyan-light);
-                        margin-bottom:8px;
-                    "
-                >
-                    🌐 Dynamic Career / Jobs URL
-                </h3>
+                <span>
+                    🌙
+                </span>
 
-                <p
-                    style="
-                        color:var(--text-muted);
-                        margin-bottom:16px;
-                        line-height:1.6;
-                    "
-                >
-                    Enter a real career or jobs page URL.
-                    The system will retrieve available job information
-                    and identify the role that best matches your resume.
-                </p>
+                <span>
+                    Theme
+                </span>
+
+            </button>
+
+        </header>
 
 
-                <div
-                    style="
-                        display:flex;
-                        gap:12px;
-                        flex-wrap:wrap;
-                    "
-                >
+        <!-- ========================================================
+             VIEW : DASHBOARD
+        ======================================================== -->
+
+        <section
+            id="view-analytics"
+            class="view-panel active"
+        >
+
+            <div class="page-heading">
+
+                <div>
+
+                    <span class="eyebrow">
+                        PERSONAL CAREER DASHBOARD
+                    </span>
+
+                    <h1 id="banner-company-role">
+
+                        <?php if ($targetCompany || $targetRole): ?>
+
+                            <?php echo h($targetCompany); ?>
+
+                            <?php if ($targetCompany && $targetRole): ?>
+                                <span> · </span>
+                            <?php endif; ?>
+
+                            <?php echo h($targetRole); ?>
+
+                        <?php else: ?>
+
+                            Career Target Not Selected
+
+                        <?php endif; ?>
+
+                    </h1>
+
+                    <p>
+                        Analyze your resume and compare it
+                        with dynamically discovered career opportunities.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <!-- METRICS -->
+
+            <div class="metrics-grid">
+
+                <div class="metric-card">
+
+                    <div class="metric-icon purple">
+                        📄
+                    </div>
+
+                    <div>
+
+                        <span class="metric-label">
+                            ATS SCORE
+                        </span>
+
+                        <strong
+                            id="metric-ats"
+                            class="metric-value"
+                        >
+                            <?php echo h($atsScore); ?>/100
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="metric-card">
+
+                    <div class="metric-icon cyan">
+                        🎯
+                    </div>
+
+                    <div>
+
+                        <span class="metric-label">
+                            JOB READINESS
+                        </span>
+
+                        <strong
+                            id="metric-readiness"
+                            class="metric-value"
+                        >
+                            0%
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="metric-card">
+
+                    <div class="metric-icon green">
+                        💼
+                    </div>
+
+                    <div>
+
+                        <span class="metric-label">
+                            JOBS FOUND
+                        </span>
+
+                        <strong
+                            id="metric-jobs"
+                            class="metric-value"
+                        >
+                            <?php echo count($careerJobs); ?>
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="metric-card">
+
+                    <div class="metric-icon orange">
+                        ⚡
+                    </div>
+
+                    <div>
+
+                        <span class="metric-label">
+                            MATCH
+                        </span>
+
+                        <strong
+                            id="metric-match"
+                            class="metric-value"
+                        >
+                            0%
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- CAREER URL -->
+
+            <div class="content-card career-source-card">
+
+                <div class="card-heading">
+
+                    <div class="card-icon">
+                        🌐
+                    </div>
+
+                    <div>
+
+                        <h2>
+                            Dynamic Career Source
+                        </h2>
+
+                        <p>
+                            Enter a real jobs or careers URL.
+                            No company or role is predefined.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="career-url-row">
 
                     <input
                         type="url"
@@ -1256,16 +1223,14 @@ $appData = [
                         class="form-control"
                         value="<?php echo h($careerUrl); ?>"
                         placeholder="https://example.com/careers/jobs"
-                        style="flex:1;min-width:250px;"
                     >
-
 
                     <button
                         type="button"
                         id="scrape-career-url"
-                        class="btn"
+                        class="btn btn-primary"
                     >
-                        🔎 Fetch & Analyze Jobs
+                        Analyze Jobs
                     </button>
 
                 </div>
@@ -1273,62 +1238,66 @@ $appData = [
 
                 <div
                     id="career-url-status"
-                    style="
-                        margin-top:12px;
-                        display:none;
-                    "
-                ></div>
-
-
-                <div
-                    id="scrape-results-box"
-                    style="
-                        margin-top:14px;
-                        display:none;
-                    "
+                    class="status-area"
                 ></div>
 
             </div>
 
 
-            <!-- ================================================= -->
             <!-- RECOMMENDATION -->
-            <!-- ================================================= -->
 
             <div
                 id="recommendation-card"
-                class="section-panel"
-                style="margin-top:24px;"
+                class="content-card recommendation-card"
             >
 
-                <h3
-                    style="
-                        color:var(--cyan-light);
-                        margin-bottom:10px;
-                    "
-                >
-                    🎯 Recommended Career Match
-                </h3>
+                <div class="card-heading">
+
+                    <div class="card-icon green-bg">
+                        🎯
+                    </div>
+
+                    <div>
+
+                        <h2>
+                            Dynamic Job Recommendation
+                        </h2>
+
+                        <p>
+                            Based on your resume and discovered jobs.
+                        </p>
+
+                    </div>
+
+                </div>
+
 
                 <div id="recommended-job">
 
                     <?php if ($recommendedJob): ?>
 
-                        <p>
-                            Recommended role based on the
-                            available career data.
-                        </p>
+                        <div class="recommendation-placeholder">
+                            A recommendation is available.
+                        </div>
 
                     <?php else: ?>
 
-                        <p
-                            style="
-                                color:var(--text-muted);
-                            "
-                        >
-                            Enter a career URL and upload your resume
-                            to receive a dynamic job recommendation.
-                        </p>
+                        <div class="empty-state">
+
+                            <div class="empty-icon">
+                                🔎
+                            </div>
+
+                            <h3>
+                                No recommendation yet
+                            </h3>
+
+                            <p>
+                                Enter a career URL and upload your
+                                resume to generate a dynamic recommendation.
+                            </p>
+
+                        </div>
 
                     <?php endif; ?>
 
@@ -1337,50 +1306,58 @@ $appData = [
             </div>
 
 
-            <!-- ================================================= -->
             <!-- CHARTS -->
-            <!-- ================================================= -->
 
             <div class="charts-grid">
 
-                <div class="chart-card">
+                <div class="content-card">
 
-                    <h4
-                        style="
-                            color:var(--cyan-light);
-                            margin-bottom:14px;
-                        "
-                    >
-                        🎯 Placement Competency
-                    </h4>
+                    <div class="card-heading compact">
+
+                        <div>
+
+                            <h2>
+                                Skill Competency
+                            </h2>
+
+                            <p>
+                                Resume vs required skills
+                            </p>
+
+                        </div>
+
+                    </div>
 
                     <div class="chart-container">
 
-                        <canvas
-                            id="radarChartCtx"
-                        ></canvas>
+                        <canvas id="radarChartCtx"></canvas>
 
                     </div>
 
                 </div>
 
 
-                <div class="chart-card">
+                <div class="content-card">
 
-                    <h4
-                        style="
-                            color:var(--cyan-light);
-                            margin-bottom:14px;
-                        "
-                    >
-                        🌐 Technical Skill Distribution
-                    </h4>
+                    <div class="card-heading compact">
+
+                        <div>
+
+                            <h2>
+                                Skill Distribution
+                            </h2>
+
+                            <p>
+                                Extracted technical skills
+                            </p>
+
+                        </div>
+
+                    </div>
 
                     <div class="chart-container">
 
-                        <canvas
-                            id="pieChartCtx"
-                        ></canvas>
+                        <canvas id="pieChartCtx"></canvas>
 
                     </div>
 
@@ -1391,65 +1368,92 @@ $appData = [
         </section>
 
 
-        <!-- ===================================================== -->
-        <!-- VIEW 2 : RESUME -->
-        <!-- ===================================================== -->
+        <!-- ========================================================
+             VIEW : RESUME
+        ======================================================== -->
 
         <section
             id="view-resume"
             class="view-panel"
-            style="display:none;"
         >
 
-            <h3>
-                📄 Resume Parser & ATS Evaluation
-            </h3>
+            <div class="page-heading">
 
-            <p
-                style="
-                    color:var(--text-muted);
-                    margin-bottom:20px;
-                "
-            >
-                Upload your resume and extract your actual skills,
-                contact information and ATS signals.
-            </p>
+                <span class="eyebrow">
+                    RESUME INTELLIGENCE
+                </span>
+
+                <h1>
+                    Resume Parser & ATS
+                </h1>
+
+                <p>
+                    Upload your resume to extract skills and
+                    calculate your ATS score.
+                </p>
+
+            </div>
 
 
             <div
                 id="resume-upload-status"
-                style="display:none;"
+                class="status-area"
             ></div>
 
 
-            <div
-                style="
-                    display:grid;
-                    grid-template-columns:1fr 1fr;
-                    gap:24px;
-                "
-            >
+            <div class="two-column-layout">
 
-                <!-- Upload -->
+                <!-- UPLOAD -->
 
-                <div class="section-panel">
+                <div class="content-card">
+
+                    <div class="card-heading">
+
+                        <div class="card-icon">
+                            📄
+                        </div>
+
+                        <div>
+
+                            <h2>
+                                Upload Resume
+                            </h2>
+
+                            <p>
+                                PDF, DOCX or TXT
+                            </p>
+
+                        </div>
+
+                    </div>
+
 
                     <form
                         id="form-resume-upload"
                         enctype="multipart/form-data"
                     >
 
-                        <div class="form-group">
+                        <div
+                            id="resume-drop-zone"
+                            class="resume-drop-zone"
+                        >
 
-                            <label class="form-label">
-                                Upload Resume
-                            </label>
+                            <div class="upload-icon">
+                                📤
+                            </div>
+
+                            <strong>
+                                Choose your resume
+                            </strong>
+
+                            <span>
+                                Upload PDF, DOCX or TXT
+                            </span>
 
                             <input
                                 type="file"
                                 id="resume-file"
                                 name="resume"
-                                class="form-control"
                                 accept=".pdf,.docx,.txt"
                             >
 
@@ -1459,9 +1463,9 @@ $appData = [
                         <button
                             type="submit"
                             id="evaluate-resume"
-                            class="btn btn-block"
+                            class="btn btn-primary btn-block"
                         >
-                            🚀 Evaluate Resume ATS
+                            Evaluate Resume
                         </button>
 
                     </form>
@@ -1469,152 +1473,221 @@ $appData = [
                 </div>
 
 
-                <!-- Extracted information -->
+                <!-- ATS -->
 
-                <div class="section-panel">
+                <div class="content-card">
 
-                    <h4
-                        style="
-                            color:var(--cyan-light);
-                            margin-bottom:14px;
-                        "
+                    <div class="card-heading">
+
+                        <div class="card-icon cyan-bg">
+                            📊
+                        </div>
+
+                        <div>
+
+                            <h2>
+                                ATS Evaluation
+                            </h2>
+
+                            <p>
+                                Resume compatibility analysis
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="ats-score-display">
+
+                        <div
+                            id="ats-score"
+                            class="ats-score"
+                        >
+                            <?php echo h($atsScore); ?>
+                        </div>
+
+                        <span>
+                            / 100
+                        </span>
+
+                    </div>
+
+
+                    <div
+                        id="ats-feedback"
+                        class="ats-feedback"
                     >
-                        🔍 Extracted Signals
-                    </h4>
-
-
-                    <p style="margin-bottom:10px;">
-
-                        <strong>Name:</strong>
-
-                        <code>
-                            <?php echo h($detectedName ?: 'Not detected'); ?>
-                        </code>
-
-                    </p>
-
-
-                    <p style="margin-bottom:10px;">
-
-                        <strong>Email:</strong>
-
-                        <?php if ($detectedEmail): ?>
-
-                            <a
-                                href="mailto:<?php echo h($detectedEmail); ?>"
-                                class="extracted-link"
-                            >
-                                <?php echo h($detectedEmail); ?>
-                            </a>
-
-                        <?php else: ?>
-
-                            <span style="color:var(--text-muted);">
-                                Not detected
-                            </span>
-
-                        <?php endif; ?>
-
-                    </p>
-
-
-                    <p style="margin-bottom:10px;">
-
-                        <strong>Phone:</strong>
-
-                        <?php if ($detectedPhone): ?>
-
-                            <a
-                                href="tel:<?php echo h($detectedPhone); ?>"
-                                class="extracted-link"
-                            >
-                                <?php echo h($detectedPhone); ?>
-                            </a>
-
-                        <?php else: ?>
-
-                            <span style="color:var(--text-muted);">
-                                Not detected
-                            </span>
-
-                        <?php endif; ?>
-
-                    </p>
-
-
-                    <p style="margin-bottom:10px;">
-
-                        <strong>LinkedIn:</strong>
-
-                        <?php if ($linkedinUrl): ?>
-
-                            <a
-                                href="<?php echo h($linkedinUrl); ?>"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="extracted-link"
-                            >
-                                <?php echo h($detectedLinkedin); ?>
-                            </a>
-
-                        <?php else: ?>
-
-                            <span style="color:var(--text-muted);">
-                                Not detected
-                            </span>
-
-                        <?php endif; ?>
-
-                    </p>
-
-
-                    <p style="margin-bottom:10px;">
-
-                        <strong>GitHub:</strong>
-
-                        <?php if ($githubUrl): ?>
-
-                            <a
-                                href="<?php echo h($githubUrl); ?>"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="extracted-link"
-                            >
-                                <?php echo h($detectedGithub); ?>
-                            </a>
-
-                        <?php else: ?>
-
-                            <span style="color:var(--text-muted);">
-                                Not detected
-                            </span>
-
-                        <?php endif; ?>
-
-                    </p>
+                        Upload your resume to calculate
+                        your ATS score.
+                    </div>
 
                 </div>
 
             </div>
 
 
-            <!-- Extracted skills -->
+            <!-- CONTACT -->
 
-            <div
-                class="section-panel"
-                style="margin-top:24px;"
-            >
+            <div class="content-card">
 
-                <h4
-                    style="
-                        color:var(--cyan-light);
-                        margin-bottom:14px;
-                    "
+                <div class="card-heading">
+
+                    <div class="card-icon">
+                        🔍
+                    </div>
+
+                    <div>
+
+                        <h2>
+                            Extracted Resume Information
+                        </h2>
+
+                        <p>
+                            Information detected from your resume
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="contact-grid">
+
+                    <div class="info-item">
+
+                        <span>
+                            Name
+                        </span>
+
+                        <strong id="resume-name">
+                            <?php echo h(
+                                $detectedName ?: 'Not detected'
+                            ); ?>
+                        </strong>
+
+                    </div>
+
+
+                    <div class="info-item">
+
+                        <span>
+                            Email
+                        </span>
+
+                        <strong id="resume-email">
+                            <?php echo h(
+                                $detectedEmail ?: 'Not detected'
+                            ); ?>
+                        </strong>
+
+                    </div>
+
+
+                    <div class="info-item">
+
+                        <span>
+                            Phone
+                        </span>
+
+                        <strong id="resume-phone">
+                            <?php echo h(
+                                $detectedPhone ?: 'Not detected'
+                            ); ?>
+                        </strong>
+
+                    </div>
+
+
+                    <div class="info-item">
+
+                        <span>
+                            LinkedIn
+                        </span>
+
+                        <?php if ($linkedinUrl): ?>
+
+                            <a
+                                id="resume-linkedin"
+                                href="<?php echo h($linkedinUrl); ?>"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                View Profile
+                            </a>
+
+                        <?php else: ?>
+
+                            <strong>
+                                Not detected
+                            </strong>
+
+                        <?php endif; ?>
+
+                    </div>
+
+
+                    <div class="info-item">
+
+                        <span>
+                            GitHub
+                        </span>
+
+                        <?php if ($githubUrl): ?>
+
+                            <a
+                                id="resume-github"
+                                href="<?php echo h($githubUrl); ?>"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                View Profile
+                            </a>
+
+                        <?php else: ?>
+
+                            <strong>
+                                Not detected
+                            </strong>
+
+                        <?php endif; ?>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- SKILLS -->
+
+            <div class="content-card">
+
+                <div class="card-heading">
+
+                    <div class="card-icon purple-bg">
+                        🧠
+                    </div>
+
+                    <div>
+
+                        <h2>
+                            Extracted Skills
+                        </h2>
+
+                        <p>
+                            Skills detected from your resume
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="resume-skills-list"
+                    class="skill-list"
                 >
-                    🧠 Extracted Resume Skills
-                </h4>
-
-                <div id="resume-skills-list">
 
                     <?php if (!empty($extractedSkills)): ?>
 
@@ -1628,181 +1701,175 @@ $appData = [
 
                     <?php else: ?>
 
-                        <span style="color:var(--text-muted);">
-                            Upload a resume to extract skills.
+                        <span class="empty-inline">
+                            No skills detected yet.
                         </span>
 
                     <?php endif; ?>
 
                 </div>
-
-            </div>
-
-
-            <!-- ATS -->
-
-            <div
-                class="section-panel"
-                style="margin-top:24px;"
-            >
-
-                <h4
-                    style="
-                        color:var(--cyan-light);
-                        margin-bottom:14px;
-                    "
-                >
-                    📊 ATS Evaluation
-                </h4>
-
-                <div
-                    id="ats-score"
-                    style="
-                        font-size:38px;
-                        font-weight:800;
-                        color:var(--cyan-light);
-                    "
-                >
-                    <?php echo h($atsScore); ?>/100
-                </div>
-
-                <p
-                    id="ats-feedback"
-                    style="
-                        color:var(--text-muted);
-                        margin-top:8px;
-                    "
-                >
-                    Upload a resume to calculate the ATS score.
-                </p>
 
             </div>
 
         </section>
 
 
-        <!-- ===================================================== -->
-        <!-- VIEW 3 : SKILL GAP -->
-        <!-- ===================================================== -->
+        <!-- ========================================================
+             VIEW : SKILL GAP
+        ======================================================== -->
 
         <section
             id="view-skillgap"
             class="view-panel"
-            style="display:none;"
         >
 
-            <h3>
-                🎯 Skill-Gap Predictor
-            </h3>
+            <div class="page-heading">
 
-            <p
-                style="
-                    color:var(--text-muted);
-                    margin-bottom:20px;
-                "
-            >
-                Compare the skills extracted from your resume
-                against the requirements of dynamically discovered jobs.
-            </p>
+                <span class="eyebrow">
+                    SKILL ANALYSIS
+                </span>
+
+                <h1>
+                    Skill-Gap Predictor
+                </h1>
+
+                <p>
+                    See which skills you already have and
+                    which skills are required by discovered jobs.
+                </p>
+
+            </div>
 
 
-            <div
-                class="section-panel"
-                style="margin-bottom:20px;"
-            >
+            <div class="two-column-layout">
 
-                <h4
-                    style="
-                        color:var(--cyan-light);
-                        margin-bottom:12px;
-                    "
-                >
-                    Your Resume Skills
-                </h4>
+                <div class="content-card">
 
-                <div id="skillgap-user-skills">
+                    <div class="card-heading">
 
-                    <?php if (!empty($extractedSkills)): ?>
+                        <div class="card-icon green-bg">
+                            ✅
+                        </div>
 
-                        <?php foreach ($extractedSkills as $skill): ?>
+                        <div>
 
-                            <span class="skill-tag">
-                                <?php echo h($skill); ?>
+                            <h2>
+                                Skills You Have
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        id="skillgap-user-skills"
+                        class="skill-list"
+                    >
+
+                        <?php if (!empty($extractedSkills)): ?>
+
+                            <?php foreach ($extractedSkills as $skill): ?>
+
+                                <span class="skill-tag matched">
+                                    <?php echo h($skill); ?>
+                                </span>
+
+                            <?php endforeach; ?>
+
+                        <?php else: ?>
+
+                            <span class="empty-inline">
+                                Upload a resume first.
                             </span>
 
-                        <?php endforeach; ?>
+                        <?php endif; ?>
 
-                    <?php else: ?>
+                    </div>
 
-                        <span style="color:var(--text-muted);">
-                            No resume skills available.
-                        </span>
+                </div>
 
-                    <?php endif; ?>
+
+                <div class="content-card">
+
+                    <div class="card-heading">
+
+                        <div class="card-icon orange-bg">
+                            📌
+                        </div>
+
+                        <div>
+
+                            <h2>
+                                Required Skills
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        id="skillgap-required-skills"
+                        class="skill-list"
+                    >
+
+                        <?php if (!empty($requiredSkills)): ?>
+
+                            <?php foreach ($requiredSkills as $skill): ?>
+
+                                <span class="skill-tag required">
+                                    <?php echo h($skill); ?>
+                                </span>
+
+                            <?php endforeach; ?>
+
+                        <?php else: ?>
+
+                            <span class="empty-inline">
+                                Analyze a career URL first.
+                            </span>
+
+                        <?php endif; ?>
+
+                    </div>
 
                 </div>
 
             </div>
 
 
-            <div
-                class="section-panel"
-                style="margin-bottom:20px;"
-            >
+            <div class="content-card">
 
-                <h4
-                    style="
-                        color:var(--cyan-light);
-                        margin-bottom:12px;
-                    "
-                >
-                    Required Skills
-                </h4>
+                <div class="card-heading">
 
-                <div id="skillgap-required-skills">
+                    <div class="card-icon red-bg">
+                        ⚠️
+                    </div>
 
-                    <?php if (!empty($requiredSkills)): ?>
+                    <div>
 
-                        <?php foreach ($requiredSkills as $skill): ?>
+                        <h2>
+                            Missing Skills
+                        </h2>
 
-                            <span class="skill-tag">
-                                <?php echo h($skill); ?>
-                            </span>
+                        <p>
+                            Skills to focus on for your target jobs
+                        </p>
 
-                        <?php endforeach; ?>
-
-                    <?php else: ?>
-
-                        <span style="color:var(--text-muted);">
-                            Required skills will appear after
-                            analyzing a career URL.
-                        </span>
-
-                    <?php endif; ?>
+                    </div>
 
                 </div>
 
-            </div>
 
-
-            <div
-                class="section-panel"
-                id="skill-gap-results"
-            >
-
-                <h4
-                    style="
-                        color:var(--cyan-light);
-                        margin-bottom:12px;
-                    "
+                <div
+                    id="missing-skills-list"
+                    class="skill-list"
                 >
-                    Missing Skills
-                </h4>
 
-                <div id="missing-skills-list">
-
-                    <span style="color:var(--text-muted);">
-                        Analyze a career URL to identify skill gaps.
+                    <span class="empty-inline">
+                        Analyze your career URL to identify
+                        missing skills.
                     </span>
 
                 </div>
@@ -1812,40 +1879,36 @@ $appData = [
         </section>
 
 
-        <!-- ===================================================== -->
-        <!-- VIEW 4 : JOB RANKING -->
-        <!-- ===================================================== -->
+        <!-- ========================================================
+             VIEW : JOB RANKING
+        ======================================================== -->
 
         <section
             id="view-jobranking"
             class="view-panel"
-            style="display:none;"
         >
 
-            <h3>
-                💼 Dynamic Job Ranking
-            </h3>
+            <div class="page-heading">
 
-            <p
-                style="
-                    color:var(--text-muted);
-                    margin-bottom:20px;
-                "
-            >
-                Jobs discovered from your career URL are ranked
-                according to your resume skill match.
-            </p>
+                <span class="eyebrow">
+                    OPPORTUNITY MATCHING
+                </span>
+
+                <h1>
+                    Dynamic Job Ranking
+                </h1>
+
+                <p>
+                    Jobs discovered from your career source
+                    are ranked according to your resume.
+                </p>
+
+            </div>
 
 
-            <div class="section-panel">
+            <div class="content-card">
 
-                <div
-                    style="
-                        display:flex;
-                        gap:12px;
-                        flex-wrap:wrap;
-                    "
-                >
+                <div class="career-url-row">
 
                     <input
                         type="url"
@@ -1853,15 +1916,14 @@ $appData = [
                         class="form-control"
                         value="<?php echo h($careerUrl); ?>"
                         placeholder="Enter career/jobs URL"
-                        style="flex:1;min-width:250px;"
                     >
 
                     <button
                         type="button"
                         id="rank-career-jobs"
-                        class="btn"
+                        class="btn btn-primary"
                     >
-                        📊 Rank Jobs
+                        Rank Jobs
                     </button>
 
                 </div>
@@ -1871,62 +1933,24 @@ $appData = [
 
             <div
                 id="job-results"
-                style="margin-top:24px;"
+                class="job-results"
             >
 
-                <?php if (!empty($careerJobs)): ?>
+                <?php if (empty($careerJobs)): ?>
 
-                    <div class="section-panel">
+                    <div class="empty-state-card">
 
-                        <h4
-                            style="
-                                color:var(--cyan-light);
-                                margin-bottom:14px;
-                            "
-                        >
-                            Discovered Jobs
-                        </h4>
-
-                        <div
-                            style="
-                                overflow-x:auto;
-                            "
-                        >
-
-                            <table class="data-table">
-
-                                <thead>
-
-                                    <tr>
-                                        <th>Company</th>
-                                        <th>Role</th>
-                                        <th>Match</th>
-                                        <th>Matched Skills</th>
-                                        <th>Missing Skills</th>
-                                    </tr>
-
-                                </thead>
-
-                                <tbody id="tbody-job-ranking">
-
-                                    <!-- JavaScript dynamically populates this -->
-
-                                </tbody>
-
-                            </table>
-
+                        <div class="empty-icon">
+                            💼
                         </div>
 
-                    </div>
+                        <h3>
+                            No jobs analyzed yet
+                        </h3>
 
-                <?php else: ?>
-
-                    <div class="section-panel">
-
-                        <p style="color:var(--text-muted);">
-                            No jobs loaded yet.
-                            Enter a career URL and click
-                            "Fetch & Analyze Jobs".
+                        <p>
+                            Enter a career URL and analyze jobs
+                            to see dynamic rankings.
                         </p>
 
                     </div>
@@ -1938,142 +1962,135 @@ $appData = [
         </section>
 
 
-        <!-- ===================================================== -->
-        <!-- VIEW 5 : ROADMAP -->
-        <!-- ===================================================== -->
+        <!-- ========================================================
+             VIEW : ROADMAP
+        ======================================================== -->
 
         <section
             id="view-roadmap"
             class="view-panel"
-            style="display:none;"
         >
 
-            <h3>
-                🗺️ Personalized Career Roadmap
-            </h3>
+            <div class="page-heading">
 
-            <p
-                style="
-                    color:var(--text-muted);
-                    margin-bottom:24px;
-                "
-            >
-                Your roadmap is generated using your resume skills,
-                missing skills and dynamically identified career target.
-            </p>
+                <span class="eyebrow">
+                    PERSONALIZED LEARNING
+                </span>
+
+                <h1>
+                    Career Roadmap
+                </h1>
+
+                <p>
+                    Build a learning path from your current
+                    skills toward your dynamically identified target.
+                </p>
+
+            </div>
 
 
             <div
                 id="container-dynamic-roadmap"
-                class="section-panel"
+                class="roadmap-container"
             >
 
-                <p style="color:var(--text-muted);">
-                    Analyze your career URL and resume to generate
-                    your personalized roadmap.
-                </p>
+                <div class="empty-state-card">
+
+                    <div class="empty-icon">
+                        🗺️
+                    </div>
+
+                    <h3>
+                        Roadmap not generated yet
+                    </h3>
+
+                    <p>
+                        Analyze your career URL and resume
+                        to generate your personalized roadmap.
+                    </p>
+
+                </div>
 
             </div>
-
-
-            <h4
-                style="
-                    color:var(--cyan-light);
-                    margin-top:32px;
-                    margin-bottom:16px;
-                "
-            >
-                📚 Recommended Skill Mastery & Projects
-            </h4>
 
 
             <div
                 id="container-dynamic-resources"
-                class="section-panel"
-            >
-
-                <p style="color:var(--text-muted);">
-                    Recommended resources will appear here.
-                </p>
-
-            </div>
+                class="resources-container"
+            ></div>
 
         </section>
 
 
-        <!-- ===================================================== -->
-        <!-- VIEW 6 : INTERVIEW -->
-        <!-- ===================================================== -->
+        <!-- ========================================================
+             VIEW : INTERVIEW
+        ======================================================== -->
 
         <section
             id="view-interview"
             class="view-panel"
-            style="display:none;"
         >
 
-            <h3>
-                🎙️ AI Interview Preparation
-            </h3>
+            <div class="page-heading">
 
-            <p
-                style="
-                    color:var(--text-muted);
-                    margin-bottom:20px;
-                "
-            >
-                Practice interview questions based on your
-                dynamically identified career target and skill gaps.
-            </p>
+                <span class="eyebrow">
+                    INTERVIEW PREPARATION
+                </span>
 
+                <h1>
+                    Interview Prep
+                </h1>
 
-            <div class="section-panel">
+                <p>
+                    Practice questions based on your career target
+                    and skill gaps.
+                </p>
 
-                <h4
-                    style="
-                        color:var(--cyan-light);
-                        margin-bottom:14px;
-                    "
-                >
-                    Interview Question
-                </h4>
+            </div>
 
 
-                <div
-                    id="interview-question"
-                    style="
-                        padding:16px;
-                        border-radius:8px;
-                        background:rgba(15,23,42,.7);
-                        margin-bottom:18px;
-                    "
-                >
-                    Click "Generate Question" to begin.
+            <div class="content-card">
+
+                <div class="interview-question-card">
+
+                    <span class="eyebrow">
+                        CURRENT QUESTION
+                    </span>
+
+                    <div id="interview-question">
+                        Generate an interview question to begin.
+                    </div>
+
                 </div>
 
 
-                <textarea
-                    id="interview-answer"
-                    class="form-control"
-                    rows="6"
-                    placeholder="Type your answer here..."
-                ></textarea>
+                <div class="form-group">
+
+                    <label
+                        for="interview-answer"
+                        class="form-label"
+                    >
+                        Your Answer
+                    </label>
+
+                    <textarea
+                        id="interview-answer"
+                        class="form-control"
+                        rows="7"
+                        placeholder="Type your answer here..."
+                    ></textarea>
+
+                </div>
 
 
-                <div
-                    style="
-                        display:flex;
-                        gap:10px;
-                        margin-top:14px;
-                        flex-wrap:wrap;
-                    "
-                >
+                <div class="button-row">
 
                     <button
                         type="button"
                         id="generate-interview-question"
-                        class="btn"
+                        class="btn btn-primary"
                     >
-                        🎯 Generate Question
+                        Generate Question
                     </button>
 
 
@@ -2082,7 +2099,7 @@ $appData = [
                         id="submit-interview-answer"
                         class="btn btn-secondary"
                     >
-                        📊 Evaluate Answer
+                        Evaluate Answer
                     </button>
 
                 </div>
@@ -2090,55 +2107,53 @@ $appData = [
 
                 <div
                     id="interview-feedback"
-                    style="
-                        margin-top:18px;
-                        display:none;
-                    "
+                    class="interview-feedback"
+                    style="display:none;"
                 ></div>
 
             </div>
 
 
-            <!-- AI assistant -->
+            <!-- AI ASSISTANT -->
 
-            <div
-                class="section-panel"
-                style="margin-top:24px;"
-            >
+            <div class="content-card">
 
-                <h4
-                    style="
-                        color:var(--cyan-light);
-                        margin-bottom:12px;
-                    "
-                >
-                    🤖 AI Interview Assistant
-                </h4>
+                <div class="card-heading">
+
+                    <div class="card-icon purple-bg">
+                        🤖
+                    </div>
+
+                    <div>
+
+                        <h2>
+                            AI Interview Assistant
+                        </h2>
+
+                        <p>
+                            Ask questions about your interview preparation.
+                        </p>
+
+                    </div>
+
+                </div>
 
 
-                <div
-                    style="
-                        display:flex;
-                        gap:10px;
-                        flex-wrap:wrap;
-                    "
-                >
+                <div class="career-url-row">
 
                     <input
                         type="text"
                         id="input-ai-prompt"
                         class="form-control"
                         placeholder="Ask an interview preparation question..."
-                        style="flex:1;min-width:250px;"
                     >
-
 
                     <button
                         type="button"
                         id="btn-submit-ai-prompt"
-                        class="btn"
+                        class="btn btn-primary"
                     >
-                        🚀 Ask AI
+                        Ask AI
                     </button>
 
                 </div>
@@ -2146,16 +2161,11 @@ $appData = [
 
                 <div
                     id="ai-assistant-response-card"
-                    style="
-                        display:none;
-                        margin-top:18px;
-                    "
+                    class="ai-response"
+                    style="display:none;"
                 >
 
-                    <h4
-                        id="ai-response-title"
-                        style="color:var(--emerald);"
-                    ></h4>
+                    <h3 id="ai-response-title"></h3>
 
                     <div id="ai-response-body"></div>
 
@@ -2166,204 +2176,244 @@ $appData = [
         </section>
 
 
-        <!-- ===================================================== -->
-        <!-- VIEW 7 : REPORT -->
-        <!-- ===================================================== -->
+        <!-- ========================================================
+             VIEW : REPORT
+        ======================================================== -->
 
         <section
             id="view-report"
             class="view-panel"
-            style="display:none;"
         >
 
-            <h3>
-                📑 Download Progress Report
-            </h3>
+            <div class="page-heading">
 
-            <p
-                style="
-                    color:var(--text-muted);
-                    margin-bottom:24px;
-                "
-            >
-                Generate a report containing your resume analysis,
-                ATS score, skills and career matching information.
-            </p>
+                <span class="eyebrow">
+                    CAREER REPORT
+                </span>
+
+                <h1>
+                    Download Report
+                </h1>
+
+                <p>
+                    Generate a PDF containing your career analysis,
+                    ATS score and skill-gap information.
+                </p>
+
+            </div>
 
 
-            <form
-                action="api.php?action=download_pdf"
-                method="POST"
-                target="_blank"
-            >
+            <div class="content-card report-card">
 
-                <input
-                    type="hidden"
-                    name="target_company"
-                    id="report-target-company"
-                    value="<?php echo h($targetCompany); ?>"
+                <div class="report-icon">
+                    📑
+                </div>
+
+                <h2>
+                    Student Career Analysis Report
+                </h2>
+
+                <p>
+                    Your report uses the career target and
+                    skills currently stored in your session.
+                </p>
+
+
+                <form
+                    action="api.php?action=download_pdf"
+                    method="POST"
+                    target="_blank"
                 >
 
-                <input
-                    type="hidden"
-                    name="target_role"
-                    id="report-target-role"
-                    value="<?php echo h($targetRole); ?>"
-                >
+                    <input
+                        type="hidden"
+                        id="report-target-company"
+                        name="target_company"
+                        value="<?php echo h($targetCompany); ?>"
+                    >
+
+                    <input
+                        type="hidden"
+                        id="report-target-role"
+                        name="target_role"
+                        value="<?php echo h($targetRole); ?>"
+                    >
 
 
-                <button
-                    type="submit"
-                    class="btn"
-                    style="
-                        padding:14px 28px;
-                        font-size:16px;
-                    "
-                >
-                    📥 Download Progress Report
-                </button>
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        Download PDF Report
+                    </button>
 
-            </form>
+                </form>
+
+            </div>
 
         </section>
 
 
-        <!-- ===================================================== -->
-        <!-- VIEW 8 : PROFILE -->
-        <!-- ===================================================== -->
+        <!-- ========================================================
+             VIEW : PROFILE
+        ======================================================== -->
 
         <section
             id="view-profile"
             class="view-panel"
-            style="display:none;"
         >
 
-            <h3>
-                👤 Profile & Resume History
-            </h3>
+            <div class="page-heading">
+
+                <span class="eyebrow">
+                    ACCOUNT
+                </span>
+
+                <h1>
+                    Profile
+                </h1>
+
+                <p>
+                    Manage your student information and
+                    review your resume evaluation history.
+                </p>
+
+            </div>
 
 
-            <div
-                style="
-                    display:grid;
-                    grid-template-columns:1fr 1fr;
-                    gap:24px;
-                    margin-bottom:32px;
-                "
-            >
+            <div class="two-column-layout">
 
-                <!-- ACCOUNT -->
+                <!-- PROFILE INFO -->
 
-                <div class="section-panel">
+                <div class="content-card">
 
-                    <h4
-                        style="
-                            color:var(--cyan-light);
-                            margin-bottom:14px;
-                        "
-                    >
-                        Account Information
-                    </h4>
+                    <div class="card-heading">
 
+                        <div class="card-icon">
+                            👤
+                        </div>
 
-                    <p style="margin-bottom:8px;">
+                        <div>
 
-                        <strong>Full Name:</strong>
+                            <h2>
+                                Student Profile
+                            </h2>
 
-                        <code>
-                            <?php echo h($user['name'] ?? ''); ?>
-                        </code>
+                        </div>
 
-                    </p>
+                    </div>
 
 
-                    <p style="margin-bottom:8px;">
+                    <div class="profile-info">
 
-                        <strong>Email:</strong>
+                        <div class="profile-info-item">
 
-                        <code>
-                            <?php echo h($user['email'] ?? ''); ?>
-                        </code>
+                            <span>
+                                Full Name
+                            </span>
 
-                    </p>
+                            <strong>
+                                <?php echo h(
+                                    $user['name'] ?? ''
+                                ); ?>
+                            </strong>
 
-
-                    <p style="margin-bottom:8px;">
-
-                        <strong>University:</strong>
-
-                        <code>
-                            <?php echo h($user['university'] ?? ''); ?>
-                        </code>
-
-                    </p>
+                        </div>
 
 
-                    <p style="margin-bottom:8px;">
+                        <div class="profile-info-item">
 
-                        <strong>Branch:</strong>
+                            <span>
+                                Email
+                            </span>
 
-                        <code>
-                            <?php echo h($user['branch'] ?? ''); ?>
-                        </code>
+                            <strong>
+                                <?php echo h(
+                                    $user['email'] ?? ''
+                                ); ?>
+                            </strong>
 
-                    </p>
-
-
-                    <p style="margin-bottom:8px;">
-
-                        <strong>Graduation Year:</strong>
-
-                        <code>
-                            <?php echo h($user['graduation_year'] ?? ''); ?>
-                        </code>
-
-                    </p>
+                        </div>
 
 
-                    <p style="margin-bottom:8px;">
+                        <div class="profile-info-item">
 
-                        <strong>LinkedIn:</strong>
+                            <span>
+                                University
+                            </span>
 
-                        <code>
-                            <?php echo h($user['linkedin'] ?? 'Not set'); ?>
-                        </code>
+                            <strong>
+                                <?php echo h(
+                                    $user['university'] ?? ''
+                                ); ?>
+                            </strong>
 
-                    </p>
+                        </div>
 
 
-                    <p style="margin-bottom:8px;">
+                        <div class="profile-info-item">
 
-                        <strong>GitHub:</strong>
+                            <span>
+                                Branch
+                            </span>
 
-                        <code>
-                            <?php echo h($user['github'] ?? 'Not set'); ?>
-                        </code>
+                            <strong>
+                                <?php echo h(
+                                    $user['branch'] ?? ''
+                                ); ?>
+                            </strong>
 
-                    </p>
+                        </div>
+
+
+                        <div class="profile-info-item">
+
+                            <span>
+                                Graduation Year
+                            </span>
+
+                            <strong>
+                                <?php echo h(
+                                    $user['graduation_year'] ?? ''
+                                ); ?>
+                            </strong>
+
+                        </div>
+
+                    </div>
 
                 </div>
 
 
                 <!-- UPDATE PROFILE -->
 
-                <div class="section-panel">
+                <div class="content-card">
 
-                    <h4
-                        style="
-                            color:var(--cyan-light);
-                            margin-bottom:14px;
-                        "
-                    >
-                        Update Profile
-                    </h4>
+                    <div class="card-heading">
+
+                        <div class="card-icon cyan-bg">
+                            ✏️
+                        </div>
+
+                        <div>
+
+                            <h2>
+                                Update Profile
+                            </h2>
+
+                        </div>
+
+                    </div>
 
 
                     <form id="profile-form">
 
                         <div class="form-group">
 
-                            <label class="form-label">
+                            <label
+                                for="profile_name"
+                                class="form-label"
+                            >
                                 Full Name
                             </label>
 
@@ -2372,7 +2422,9 @@ $appData = [
                                 id="profile_name"
                                 name="name"
                                 class="form-control"
-                                value="<?php echo h($user['name'] ?? ''); ?>"
+                                value="<?php echo h(
+                                    $user['name'] ?? ''
+                                ); ?>"
                             >
 
                         </div>
@@ -2380,7 +2432,10 @@ $appData = [
 
                         <div class="form-group">
 
-                            <label class="form-label">
+                            <label
+                                for="profile_email"
+                                class="form-label"
+                            >
                                 Email
                             </label>
 
@@ -2389,7 +2444,9 @@ $appData = [
                                 id="profile_email"
                                 name="email"
                                 class="form-control"
-                                value="<?php echo h($user['email'] ?? ''); ?>"
+                                value="<?php echo h(
+                                    $user['email'] ?? ''
+                                ); ?>"
                                 readonly
                             >
 
@@ -2398,7 +2455,10 @@ $appData = [
 
                         <div class="form-group">
 
-                            <label class="form-label">
+                            <label
+                                for="profile_university"
+                                class="form-label"
+                            >
                                 University
                             </label>
 
@@ -2407,7 +2467,9 @@ $appData = [
                                 id="profile_university"
                                 name="university"
                                 class="form-control"
-                                value="<?php echo h($user['university'] ?? ''); ?>"
+                                value="<?php echo h(
+                                    $user['university'] ?? ''
+                                ); ?>"
                             >
 
                         </div>
@@ -2415,7 +2477,10 @@ $appData = [
 
                         <div class="form-group">
 
-                            <label class="form-label">
+                            <label
+                                for="profile_degree"
+                                class="form-label"
+                            >
                                 Degree / Branch
                             </label>
 
@@ -2424,7 +2489,9 @@ $appData = [
                                 id="profile_degree"
                                 name="degree"
                                 class="form-control"
-                                value="<?php echo h($user['branch'] ?? ''); ?>"
+                                value="<?php echo h(
+                                    $user['branch'] ?? ''
+                                ); ?>"
                             >
 
                         </div>
@@ -2432,8 +2499,11 @@ $appData = [
 
                         <div class="form-group">
 
-                            <label class="form-label">
-                                Major / Specialization
+                            <label
+                                for="profile_major"
+                                class="form-label"
+                            >
+                                Specialization
                             </label>
 
                             <input
@@ -2441,7 +2511,9 @@ $appData = [
                                 id="profile_major"
                                 name="major"
                                 class="form-control"
-                                value="<?php echo h($user['major'] ?? ''); ?>"
+                                value="<?php echo h(
+                                    $user['major'] ?? ''
+                                ); ?>"
                             >
 
                         </div>
@@ -2449,7 +2521,10 @@ $appData = [
 
                         <div class="form-group">
 
-                            <label class="form-label">
+                            <label
+                                for="profile_gradyear"
+                                class="form-label"
+                            >
                                 Graduation Year
                             </label>
 
@@ -2458,7 +2533,9 @@ $appData = [
                                 id="profile_gradyear"
                                 name="graduation_year"
                                 class="form-control"
-                                value="<?php echo h($user['graduation_year'] ?? ''); ?>"
+                                value="<?php echo h(
+                                    $user['graduation_year'] ?? ''
+                                ); ?>"
                             >
 
                         </div>
@@ -2466,7 +2543,10 @@ $appData = [
 
                         <div class="form-group">
 
-                            <label class="form-label">
+                            <label
+                                for="profile_linkedin"
+                                class="form-label"
+                            >
                                 LinkedIn
                             </label>
 
@@ -2475,7 +2555,9 @@ $appData = [
                                 id="profile_linkedin"
                                 name="linkedin"
                                 class="form-control"
-                                value="<?php echo h($user['linkedin'] ?? ''); ?>"
+                                value="<?php echo h(
+                                    $user['linkedin'] ?? ''
+                                ); ?>"
                             >
 
                         </div>
@@ -2483,7 +2565,10 @@ $appData = [
 
                         <div class="form-group">
 
-                            <label class="form-label">
+                            <label
+                                for="profile_github"
+                                class="form-label"
+                            >
                                 GitHub
                             </label>
 
@@ -2492,7 +2577,9 @@ $appData = [
                                 id="profile_github"
                                 name="github"
                                 class="form-control"
-                                value="<?php echo h($user['github'] ?? ''); ?>"
+                                value="<?php echo h(
+                                    $user['github'] ?? ''
+                                ); ?>"
                             >
 
                         </div>
@@ -2500,18 +2587,15 @@ $appData = [
 
                         <button
                             type="submit"
-                            class="btn btn-block"
+                            class="btn btn-primary btn-block"
                         >
-                            💾 Save Profile
+                            Save Profile
                         </button>
 
 
                         <div
                             id="profile-message"
-                            style="
-                                margin-top:12px;
-                                display:none;
-                            "
+                            class="status-area"
                         ></div>
 
                     </form>
@@ -2521,99 +2605,133 @@ $appData = [
             </div>
 
 
-            <!-- ================================================= -->
             <!-- HISTORY -->
-            <!-- ================================================= -->
 
-            <h4
-                style="
-                    color:var(--cyan-light);
-                    margin-bottom:14px;
-                "
-            >
-                📜 Resume Evaluation History
-            </h4>
+            <div class="content-card">
 
+                <div class="card-heading">
 
-            <?php if (!empty($resumeHistory)): ?>
+                    <div class="card-icon">
+                        📜
+                    </div>
 
-                <div
-                    style="
-                        overflow-x:auto;
-                    "
-                >
+                    <div>
 
-                    <table class="data-table">
+                        <h2>
+                            Resume Evaluation History
+                        </h2>
 
-                        <thead>
+                        <p>
+                            Previous resume analysis results
+                        </p>
 
-                            <tr>
+                    </div>
 
-                                <th>Date</th>
-                                <th>Resume File</th>
-                                <th>Domain</th>
-                                <th>ATS Score</th>
-                                <th>Readiness</th>
-                                <th>Confidence</th>
-
-                            </tr>
-
-                        </thead>
+                </div>
 
 
-                        <tbody>
+                <?php if (!empty($resumeHistory)): ?>
 
-                            <?php foreach ($resumeHistory as $history): ?>
+                    <div class="table-wrapper">
+
+                        <table class="data-table">
+
+                            <thead>
 
                                 <tr>
 
-                                    <td>
-                                        <?php echo h($history['created_at'] ?? ''); ?>
-                                    </td>
+                                    <th>
+                                        Date
+                                    </th>
 
-                                    <td>
-                                        <?php echo h($history['file_name'] ?? ''); ?>
-                                    </td>
+                                    <th>
+                                        Resume
+                                    </th>
 
-                                    <td>
-                                        <?php echo h($history['domain'] ?? ''); ?>
-                                    </td>
+                                    <th>
+                                        ATS
+                                    </th>
 
-                                    <td>
-                                        <?php echo h($history['ats_score'] ?? '0'); ?>/100
-                                    </td>
+                                    <th>
+                                        Readiness
+                                    </th>
 
-                                    <td>
-                                        <?php echo h($history['readiness_score'] ?? '0'); ?>%
-                                    </td>
-
-                                    <td>
-                                        <?php echo h($history['confidence_score'] ?? '0'); ?>%
-                                    </td>
+                                    <th>
+                                        Confidence
+                                    </th>
 
                                 </tr>
 
-                            <?php endforeach; ?>
+                            </thead>
 
-                        </tbody>
 
-                    </table>
+                            <tbody>
 
-                </div>
+                                <?php foreach ($resumeHistory as $history): ?>
 
-            <?php else: ?>
+                                    <tr>
 
-                <div class="section-panel">
+                                        <td>
+                                            <?php echo h(
+                                                $history['created_at'] ?? ''
+                                            ); ?>
+                                        </td>
 
-                    <p style="color:var(--text-muted);">
+                                        <td>
+                                            <?php echo h(
+                                                $history['file_name'] ?? ''
+                                            ); ?>
+                                        </td>
 
-                        No resume evaluation history available yet.
+                                        <td>
+                                            <?php echo h(
+                                                $history['ats_score'] ?? 0
+                                            ); ?>/100
+                                        </td>
 
-                    </p>
+                                        <td>
+                                            <?php echo h(
+                                                $history['readiness_score'] ?? 0
+                                            ); ?>%
+                                        </td>
 
-                </div>
+                                        <td>
+                                            <?php echo h(
+                                                $history['confidence_score'] ?? 0
+                                            ); ?>%
+                                        </td>
 
-            <?php endif; ?>
+                                    </tr>
+
+                                <?php endforeach; ?>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="empty-state">
+
+                        <div class="empty-icon">
+                            📄
+                        </div>
+
+                        <h3>
+                            No resume history
+                        </h3>
+
+                        <p>
+                            Your resume evaluations will appear here.
+                        </p>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
 
         </section>
 
@@ -2624,28 +2742,26 @@ $appData = [
 <?php endif; ?>
 
 
-<!-- ============================================================= -->
-<!-- APPLICATION SCRIPT -->
-<!-- ============================================================= -->
+<!-- ================================================================
+     APPLICATION DATA
+================================================================ -->
 
 <script>
 
-window.APP_DATA =
-    <?php echo json_encode(
-        $appData,
-        JSON_UNESCAPED_SLASHES |
-        JSON_UNESCAPED_UNICODE
-    ); ?>;
-
-window.CANONICAL_SKILLS =
-    <?php echo json_encode(
-        $canonicalSkills,
-        JSON_UNESCAPED_SLASHES |
-        JSON_UNESCAPED_UNICODE
-    ); ?>;
+window.APP_DATA = <?php
+echo json_encode(
+    $appData,
+    JSON_UNESCAPED_SLASHES |
+    JSON_UNESCAPED_UNICODE
+);
+?>;
 
 </script>
 
+
+<!-- ================================================================
+     APPLICATION JAVASCRIPT
+================================================================ -->
 
 <script
     src="static/app.js?v=<?php echo time(); ?>"
