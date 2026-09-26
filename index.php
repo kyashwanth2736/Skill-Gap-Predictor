@@ -4,11 +4,22 @@
    SESSION CONFIGURATION
    ============================================================ */
 
+/*
+ * Prevent the browser/proxy from displaying an old login page
+ * after successful authentication.
+ */
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Cache-Control: post-check=0, pre-check=0', false);
+header('Pragma: no-cache');
+header('Expires: 0');
+
+
 $isHttps =
     (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     ||
     (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
         && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+
 
 if (session_status() === PHP_SESSION_NONE) {
 
@@ -24,6 +35,15 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
+/*
+ * Keep the authenticated session active.
+ */
+if (session_status() === PHP_SESSION_ACTIVE) {
+    $_SESSION['last_activity'] = time();
+}
+
+
 require_once __DIR__ . '/db.php';
 
 
@@ -35,11 +55,14 @@ function h($value) {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
+
 function safeArray($value) {
     return is_array($value) ? $value : [];
 }
 
+
 function formatSocialUrl($url) {
+
     $url = trim((string)$url);
 
     if ($url === '') {
@@ -62,26 +85,37 @@ $user = null;
 
 
 /*
- * IMPORTANT:
- * First trust the authenticated session created by api.php.
- * This prevents index.php from immediately returning to the
- * login screen after a successful login.
+ * Primary authentication source:
+ * use the authenticated user stored by api.php.
+ *
+ * This is intentionally checked before getCurrentUser()
+ * so a successful login is not lost during redirect.
  */
 
 if (
-    isset($_SESSION['logged_in']) &&
-    $_SESSION['logged_in'] === true &&
     isset($_SESSION['user']) &&
-    is_array($_SESSION['user'])
+    is_array($_SESSION['user']) &&
+    !empty($_SESSION['user'])
 ) {
+
     $user = $_SESSION['user'];
+
+    /*
+     * Keep authentication flags synchronized.
+     */
+
+    $_SESSION['logged_in'] = true;
+
+    if (isset($user['id'])) {
+        $_SESSION['user_id'] = (int)$user['id'];
+    }
 }
 
 
 /*
  * Backward compatibility:
- * If the application already has a getCurrentUser() function,
- * use it only when the session user is not already available.
+ * If no authenticated session user exists, use the existing
+ * database helper when available.
  */
 
 if (!$user && function_exists('getCurrentUser')) {
@@ -90,12 +124,15 @@ if (!$user && function_exists('getCurrentUser')) {
 
         $currentUser = getCurrentUser();
 
-        if (is_array($currentUser) && !empty($currentUser)) {
+        if (
+            is_array($currentUser) &&
+            !empty($currentUser)
+        ) {
+
             $user = $currentUser;
 
             /*
-             * Synchronize the session so all parts of the
-             * application use the same authenticated user.
+             * Synchronize the session.
              */
 
             $_SESSION['user'] = $user;
@@ -113,50 +150,40 @@ if (!$user && function_exists('getCurrentUser')) {
 }
 
 
-/*
- * Final fallback:
- * If a session user exists but logged_in was not created by
- * an older version of api.php, still recognize the session.
- */
-
-if (
-    !$user &&
-    isset($_SESSION['user']) &&
-    is_array($_SESSION['user']) &&
-    !empty($_SESSION['user'])
-) {
-    $user = $_SESSION['user'];
-
-    $_SESSION['logged_in'] = true;
-
-    if (isset($user['id'])) {
-        $_SESSION['user_id'] = (int)$user['id'];
-    }
-}
-
-
 /* ============================================================
    SESSION DATA
    ============================================================ */
 
-$careerUrl = $_SESSION['career_url'] ?? '';
-$targetCompany = $_SESSION['target_company'] ?? '';
-$targetRole = $_SESSION['target_role'] ?? '';
+$careerUrl =
+    $_SESSION['career_url'] ?? '';
+
+
+$targetCompany =
+    $_SESSION['target_company'] ?? '';
+
+
+$targetRole =
+    $_SESSION['target_role'] ?? '';
+
 
 $requiredSkills = safeArray(
     $_SESSION['required_skills'] ?? []
 );
 
+
 $extractedSkills = safeArray(
     $_SESSION['extracted_skills'] ?? []
 );
+
 
 $atsScore = (float)(
     $_SESSION['ats_score'] ?? 0
 );
 
+
 $recommendedJob =
     $_SESSION['recommended_job'] ?? null;
+
 
 $careerJobs = safeArray(
     $_SESSION['career_jobs'] ?? []
@@ -170,14 +197,18 @@ $careerJobs = safeArray(
 $resumeName =
     $_SESSION['resume_name'] ?? '';
 
+
 $resumeEmail =
     $_SESSION['resume_email'] ?? '';
+
 
 $resumePhone =
     $_SESSION['resume_phone'] ?? '';
 
+
 $resumeLinkedin =
     $_SESSION['resume_linkedin'] ?? '';
+
 
 $resumeGithub =
     $_SESSION['resume_github'] ?? '';
@@ -188,6 +219,7 @@ $resumeGithub =
    ============================================================ */
 
 $resumeHistory = [];
+
 
 if (
     $user &&
@@ -255,10 +287,30 @@ $appData = [
 
     <meta charset="UTF-8">
 
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
+
+
+    <meta
+        http-equiv="Cache-Control"
+        content="no-cache, no-store, must-revalidate"
+    >
+
+
+    <meta
+        http-equiv="Pragma"
+        content="no-cache"
+    >
+
+
+    <meta
+        http-equiv="Expires"
+        content="0"
+    >
+
 
     <title>
         Skill-Gap Predictor
