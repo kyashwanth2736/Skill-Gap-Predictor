@@ -13,7 +13,14 @@
         user: APP.user || null,
 
         careerUrl: APP.careerUrl || "",
-        careerJobs: Array.isArray(APP.careerJobs) ? APP.careerJobs : [],
+
+        careerJobs: Array.isArray(APP.careerJobs)
+            ? APP.careerJobs
+            : [],
+
+        careerJobCount: Array.isArray(APP.careerJobs)
+            ? APP.careerJobs.length
+            : Number(APP.careerJobCount || 0),
 
         extractedSkills: Array.isArray(APP.extractedSkills)
             ? APP.extractedSkills
@@ -130,14 +137,365 @@
             }
 
             button.disabled = true;
+            button.classList.add("is-loading");
             button.innerHTML = loadingText;
         } else {
             button.disabled = false;
+            button.classList.remove("is-loading");
 
             if (button.dataset.originalText) {
                 button.innerHTML = button.dataset.originalText;
             }
         }
+    }
+
+    /* ============================================================
+       CUSTOM POPUP UI
+       ============================================================ */
+
+    function initPopupSystem() {
+        if ($("sgp-custom-popup")) {
+            return;
+        }
+
+        const style = document.createElement("style");
+
+        style.id = "sgp-popup-runtime-style";
+
+        style.textContent = `
+            .sgp-popup-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 99999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                background: rgba(15, 23, 42, 0.58);
+                backdrop-filter: blur(7px);
+                -webkit-backdrop-filter: blur(7px);
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+                transition:
+                    opacity .22s ease,
+                    visibility .22s ease;
+            }
+
+            .sgp-popup-overlay.show {
+                opacity: 1;
+                visibility: visible;
+                pointer-events: auto;
+            }
+
+            .sgp-popup-card {
+                width: min(440px, 100%);
+                border-radius: 22px;
+                padding: 28px;
+                background: var(--surface, #ffffff);
+                color: var(--text-primary, #111827);
+                border: 1px solid var(--border, #e5e7eb);
+                box-shadow:
+                    0 25px 70px rgba(0, 0, 0, .22);
+                transform: translateY(18px) scale(.96);
+                transition: transform .24s ease;
+                text-align: center;
+            }
+
+            .sgp-popup-overlay.show .sgp-popup-card {
+                transform: translateY(0) scale(1);
+            }
+
+            .sgp-popup-icon {
+                width: 68px;
+                height: 68px;
+                margin: 0 auto 16px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 30px;
+                font-weight: 700;
+            }
+
+            .sgp-popup-icon.success {
+                background: rgba(34, 197, 94, .14);
+                color: #16a34a;
+            }
+
+            .sgp-popup-icon.error {
+                background: rgba(239, 68, 68, .14);
+                color: #dc2626;
+            }
+
+            .sgp-popup-icon.info {
+                background: rgba(59, 130, 246, .14);
+                color: #2563eb;
+            }
+
+            .sgp-popup-icon.warning {
+                background: rgba(245, 158, 11, .14);
+                color: #d97706;
+            }
+
+            .sgp-popup-title {
+                margin: 0;
+                font-size: 22px;
+                line-height: 1.3;
+                font-weight: 700;
+            }
+
+            .sgp-popup-message {
+                margin: 11px 0 0;
+                color: var(--text-secondary, #64748b);
+                line-height: 1.6;
+                font-size: 15px;
+                white-space: pre-line;
+            }
+
+            .sgp-popup-actions {
+                display: flex;
+                justify-content: center;
+                gap: 10px;
+                margin-top: 23px;
+            }
+
+            .sgp-popup-button {
+                min-width: 110px;
+                border: 0;
+                border-radius: 11px;
+                padding: 11px 20px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                transition:
+                    transform .18s ease,
+                    opacity .18s ease;
+                background: var(--primary, #635bff);
+                color: #fff;
+            }
+
+            .sgp-popup-button:hover {
+                transform: translateY(-1px);
+                opacity: .92;
+            }
+
+            .sgp-popup-loading {
+                width: 42px;
+                height: 42px;
+                margin: 0 auto 17px;
+                border-radius: 50%;
+                border: 4px solid rgba(99, 91, 255, .18);
+                border-top-color: var(--primary, #635bff);
+                animation: sgpPopupSpin .8s linear infinite;
+            }
+
+            @keyframes sgpPopupSpin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            @media (max-width: 480px) {
+                .sgp-popup-card {
+                    padding: 24px 20px;
+                    border-radius: 18px;
+                }
+
+                .sgp-popup-title {
+                    font-size: 20px;
+                }
+            }
+        `;
+
+        document.head.appendChild(style);
+
+        const overlay = document.createElement("div");
+
+        overlay.id = "sgp-custom-popup";
+        overlay.className = "sgp-popup-overlay";
+
+        overlay.innerHTML = `
+            <div class="sgp-popup-card"
+                 role="dialog"
+                 aria-modal="true">
+
+                <div id="sgp-popup-icon"
+                     class="sgp-popup-icon success">
+                    ✓
+                </div>
+
+                <div id="sgp-popup-loading"
+                     class="sgp-popup-loading"
+                     style="display:none;">
+                </div>
+
+                <h3 id="sgp-popup-title"
+                    class="sgp-popup-title">
+                    Success
+                </h3>
+
+                <div id="sgp-popup-message"
+                     class="sgp-popup-message">
+                </div>
+
+                <div class="sgp-popup-actions">
+                    <button type="button"
+                            id="sgp-popup-ok"
+                            class="sgp-popup-button">
+                        OK
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const okButton = $("sgp-popup-ok");
+
+        if (okButton) {
+            okButton.addEventListener("click", closePopup);
+        }
+
+        overlay.addEventListener("click", (event) => {
+            if (event.target === overlay) {
+                closePopup();
+            }
+        });
+    }
+
+    function popupIcon(type) {
+        switch (type) {
+            case "success":
+                return "✓";
+
+            case "error":
+                return "×";
+
+            case "warning":
+                return "!";
+
+            default:
+                return "i";
+        }
+    }
+
+    function showPopup(
+        title,
+        message,
+        type = "info",
+        options = {}
+    ) {
+        initPopupSystem();
+
+        const overlay = $("sgp-custom-popup");
+        const icon = $("sgp-popup-icon");
+        const titleElement = $("sgp-popup-title");
+        const messageElement = $("sgp-popup-message");
+        const okButton = $("sgp-popup-ok");
+        const loading = $("sgp-popup-loading");
+
+        if (
+            !overlay ||
+            !icon ||
+            !titleElement ||
+            !messageElement
+        ) {
+            return Promise.resolve();
+        }
+
+        icon.className =
+            `sgp-popup-icon ${type}`;
+
+        icon.textContent =
+            popupIcon(type);
+
+        icon.style.display =
+            options.loading ? "none" : "flex";
+
+        if (loading) {
+            loading.style.display =
+                options.loading ? "block" : "none";
+        }
+
+        titleElement.textContent =
+            title || "Skill-Gap Predictor";
+
+        messageElement.textContent =
+            message || "";
+
+        if (okButton) {
+            okButton.style.display =
+                options.loading ? "none" : "inline-block";
+
+            okButton.textContent =
+                options.buttonText || "OK";
+        }
+
+        overlay.classList.add("show");
+
+        if (options.autoClose) {
+            setTimeout(() => {
+                closePopup();
+            }, options.autoClose);
+        }
+
+        return new Promise((resolve) => {
+            overlay.dataset.popupResolver = "pending";
+
+            overlay._popupResolve = resolve;
+        });
+    }
+
+    function closePopup() {
+        const overlay = $("sgp-custom-popup");
+
+        if (!overlay) {
+            return;
+        }
+
+        overlay.classList.remove("show");
+
+        if (typeof overlay._popupResolve === "function") {
+            const resolve =
+                overlay._popupResolve;
+
+            overlay._popupResolve = null;
+
+            resolve();
+        }
+    }
+
+    function showInfoPopup(title, message) {
+        return showPopup(
+            title,
+            message,
+            "info"
+        );
+    }
+
+    function showSuccessPopup(title, message) {
+        return showPopup(
+            title,
+            message,
+            "success"
+        );
+    }
+
+    function showErrorPopup(title, message) {
+        return showPopup(
+            title,
+            message,
+            "error"
+        );
+    }
+
+    function showWarningPopup(title, message) {
+        return showPopup(
+            title,
+            message,
+            "warning"
+        );
     }
 
     /* ============================================================
@@ -173,7 +531,23 @@
                 }
             );
 
-            return await response.json();
+            const text = await response.text();
+
+            try {
+                return JSON.parse(text);
+            } catch (error) {
+                console.error(
+                    "Invalid GET API response:",
+                    text
+                );
+
+                return {
+                    success: false,
+                    status: "error",
+                    message:
+                        "The server returned an invalid response."
+                };
+            }
         }
 
         const formData =
@@ -185,18 +559,30 @@
             formData.append("action", action);
 
             Object.entries(data).forEach(([key, value]) => {
-                if (value === undefined || value === null) {
+                if (
+                    value === undefined ||
+                    value === null
+                ) {
                     return;
                 }
 
                 if (typeof value === "object") {
-                    formData.append(key, JSON.stringify(value));
+                    formData.append(
+                        key,
+                        JSON.stringify(value)
+                    );
                 } else {
-                    formData.append(key, String(value));
+                    formData.append(
+                        key,
+                        String(value)
+                    );
                 }
             });
         } else if (!formData.has("action")) {
-            formData.append("action", action);
+            formData.append(
+                "action",
+                action
+            );
         }
 
         options.body = formData;
@@ -214,12 +600,16 @@
         try {
             return JSON.parse(text);
         } catch (error) {
-            console.error("Invalid API response:", text);
+            console.error(
+                "Invalid API response:",
+                text
+            );
 
             return {
                 success: false,
                 status: "error",
-                message: "The server returned an invalid response."
+                message:
+                    "The server returned an invalid response."
             };
         }
     }
@@ -232,6 +622,70 @@
                 result.status === "success"
             )
         );
+    }
+
+    /* ============================================================
+       API JOB EXTRACTION
+       ============================================================ */
+
+    function extractJobsFromResponse(result) {
+        if (!result || typeof result !== "object") {
+            return [];
+        }
+
+        const candidates = [
+            result.jobs,
+            result.careerJobs,
+            result.career_jobs,
+            result.data?.jobs,
+            result.data?.careerJobs,
+            result.data?.career_jobs,
+            result.result?.jobs,
+            result.result?.careerJobs,
+            result.result?.career_jobs
+        ];
+
+        for (const candidate of candidates) {
+            if (Array.isArray(candidate)) {
+                return candidate;
+            }
+        }
+
+        return [];
+    }
+
+    function extractJobCountFromResponse(result) {
+        if (!result || typeof result !== "object") {
+            return 0;
+        }
+
+        const values = [
+            result.job_count,
+            result.jobs_count,
+            result.count,
+            result.total_jobs,
+            result.data?.job_count,
+            result.data?.jobs_count,
+            result.data?.count,
+            result.data?.total_jobs,
+            result.result?.job_count,
+            result.result?.jobs_count,
+            result.result?.count,
+            result.result?.total_jobs
+        ];
+
+        for (const value of values) {
+            const number = Number(value);
+
+            if (
+                Number.isFinite(number) &&
+                number >= 0
+            ) {
+                return number;
+            }
+        }
+
+        return 0;
     }
 
     /* ============================================================
@@ -259,13 +713,17 @@
         }, 300);
     }
 
-    /* Never leave the loader stuck */
     window.addEventListener("load", () => {
-        setTimeout(hidePageLoader, 100);
+        setTimeout(
+            hidePageLoader,
+            100
+        );
     });
 
-    /* Safety fallback */
-    setTimeout(hidePageLoader, 2500);
+    setTimeout(
+        hidePageLoader,
+        2500
+    );
 
     /* ============================================================
        AUTH TABS
@@ -325,29 +783,41 @@
         }
 
         if (loginTab) {
-            loginTab.addEventListener("click", showLogin);
+            loginTab.addEventListener(
+                "click",
+                showLogin
+            );
         }
 
         if (signupTab) {
-            signupTab.addEventListener("click", showSignup);
+            signupTab.addEventListener(
+                "click",
+                showSignup
+            );
         }
 
         qsa(
             "#create-account, #create-account-link, .create-account-link, [data-action='create-account']"
         ).forEach((element) => {
-            element.addEventListener("click", (event) => {
-                event.preventDefault();
-                showSignup();
-            });
+            element.addEventListener(
+                "click",
+                (event) => {
+                    event.preventDefault();
+                    showSignup();
+                }
+            );
         });
 
         qsa(
             "#back-to-login, .back-to-login, [data-action='back-login']"
         ).forEach((element) => {
-            element.addEventListener("click", (event) => {
-                event.preventDefault();
-                showLogin();
-            });
+            element.addEventListener(
+                "click",
+                (event) => {
+                    event.preventDefault();
+                    showLogin();
+                }
+            );
         });
     }
 
@@ -356,7 +826,8 @@
        ============================================================ */
 
     function initLogin() {
-        const loginForm = $("login-form");
+        const loginForm =
+            $("login-form");
 
         const loginButton =
             $("btn-do-login") ||
@@ -370,12 +841,17 @@
             $("login_password") ||
             $("login-password");
 
-        const errorMessage = getMessageElement(
-            "login-error-msg",
-            "login-message"
-        );
+        const errorMessage =
+            getMessageElement(
+                "login-error-msg",
+                "login-message"
+            );
 
-        if (!loginButton || !emailInput || !passwordInput) {
+        if (
+            !loginButton ||
+            !emailInput ||
+            !passwordInput
+        ) {
             return;
         }
 
@@ -384,24 +860,32 @@
                 event.preventDefault();
             }
 
-            const email = emailInput.value.trim();
-            const password = passwordInput.value;
+            const email =
+                emailInput.value.trim();
 
-            showMessage(errorMessage, "");
+            const password =
+                passwordInput.value;
+
+            showMessage(
+                errorMessage,
+                ""
+            );
 
             if (!email) {
-                showMessage(
-                    errorMessage,
+                await showErrorPopup(
+                    "Email Required",
                     "Please enter your email address."
                 );
+
                 return;
             }
 
             if (!password) {
-                showMessage(
-                    errorMessage,
+                await showErrorPopup(
+                    "Password Required",
                     "Please enter your password."
                 );
+
                 return;
             }
 
@@ -412,33 +896,62 @@
             );
 
             try {
-                const result = await apiRequest(
-                    "login",
-                    {
-                        email,
-                        password
-                    }
-                );
+                const result =
+                    await apiRequest(
+                        "login",
+                        {
+                            email,
+                            password
+                        }
+                    );
 
                 if (apiSuccess(result)) {
-                    window.location.href = window.location.pathname;
+                    state.loggedIn = true;
+
+                    await showSuccessPopup(
+                        "Login Successful",
+                        "Welcome back! Redirecting to your dashboard..."
+                    );
+
+                    window.location.href =
+                        window.location.pathname;
+
                     return;
                 }
 
+                const message =
+                    result.message ||
+                    "Invalid email or password.";
+
                 showMessage(
                     errorMessage,
-                    result.message ||
-                    "Invalid email or password."
+                    message
+                );
+
+                await showErrorPopup(
+                    "Login Failed",
+                    message
                 );
             } catch (error) {
                 console.error(error);
 
+                const message =
+                    "Unable to connect to the server. Please try again.";
+
                 showMessage(
                     errorMessage,
-                    "Unable to connect to the server."
+                    message
+                );
+
+                await showErrorPopup(
+                    "Connection Error",
+                    message
                 );
             } finally {
-                setLoading(loginButton, false);
+                setLoading(
+                    loginButton,
+                    false
+                );
             }
         }
 
@@ -460,19 +973,30 @@
        ============================================================ */
 
     function initSignup() {
-        const signupForm = $("signup-form");
+        const signupForm =
+            $("signup-form");
 
         const signupButton =
             $("btn-do-signup") ||
             $("signup-submit");
 
-        const nameInput = $("signup_name");
-        const emailInput = $("signup_email");
-        const passwordInput = $("signup_pwd");
+        const nameInput =
+            $("signup_name");
 
-        const universityInput = $("signup_uni");
-        const branchInput = $("signup_branch");
-        const majorInput = $("signup_major");
+        const emailInput =
+            $("signup_email");
+
+        const passwordInput =
+            $("signup_pwd");
+
+        const universityInput =
+            $("signup_uni");
+
+        const branchInput =
+            $("signup_branch");
+
+        const majorInput =
+            $("signup_major");
 
         const yearInput =
             $("signup_gradyear") ||
@@ -487,14 +1011,21 @@
         const termsInput =
             $("signup-terms");
 
-        const errorMessage = getMessageElement(
-            "signup-error-msg",
-            "signup-message"
-        );
+        const errorMessage =
+            getMessageElement(
+                "signup-error-msg",
+                "signup-message"
+            );
 
-        const successMessage = $("signup-success-msg");
+        const successMessage =
+            $("signup-success-msg");
 
-        if (!signupButton || !nameInput || !emailInput || !passwordInput) {
+        if (
+            !signupButton ||
+            !nameInput ||
+            !emailInput ||
+            !passwordInput
+        ) {
             return;
         }
 
@@ -503,12 +1034,24 @@
                 event.preventDefault();
             }
 
-            showMessage(errorMessage, "");
-            showMessage(successMessage, "");
+            showMessage(
+                errorMessage,
+                ""
+            );
 
-            const name = nameInput.value.trim();
-            const email = emailInput.value.trim();
-            const password = passwordInput.value;
+            showMessage(
+                successMessage,
+                ""
+            );
+
+            const name =
+                nameInput.value.trim();
+
+            const email =
+                emailInput.value.trim();
+
+            const password =
+                passwordInput.value;
 
             const university =
                 universityInput
@@ -541,42 +1084,52 @@
                     : "";
 
             if (!name) {
-                showMessage(
-                    errorMessage,
+                await showErrorPopup(
+                    "Name Required",
                     "Please enter your full name."
                 );
+
                 return;
             }
 
             if (!email) {
-                showMessage(
-                    errorMessage,
+                await showErrorPopup(
+                    "Email Required",
                     "Please enter your email address."
                 );
+
                 return;
             }
 
-            if (!/^\S+@\S+\.\S+$/.test(email)) {
-                showMessage(
-                    errorMessage,
+            if (
+                !/^\S+@\S+\.\S+$/.test(email)
+            ) {
+                await showErrorPopup(
+                    "Invalid Email",
                     "Please enter a valid email address."
                 );
+
                 return;
             }
 
             if (password.length < 6) {
-                showMessage(
-                    errorMessage,
+                await showErrorPopup(
+                    "Password Too Short",
                     "Password must contain at least 6 characters."
                 );
+
                 return;
             }
 
-            if (termsInput && !termsInput.checked) {
-                showMessage(
-                    errorMessage,
+            if (
+                termsInput &&
+                !termsInput.checked
+            ) {
+                await showErrorPopup(
+                    "Terms Required",
                     "Please accept the terms to create your account."
                 );
+
                 return;
             }
 
@@ -587,64 +1140,183 @@
             );
 
             try {
-                const result = await apiRequest(
-                    "signup",
-                    {
-                        name,
-                        email,
-                        password,
-                        university,
-                        branch,
-                        major,
-                        graduation_year: graduationYear,
-                        linkedin,
-                        github,
+                const result =
+                    await apiRequest(
+                        "signup",
+                        {
+                            name,
+                            email,
+                            password,
+                            university,
+                            branch,
+                            major,
+                            graduation_year:
+                                graduationYear,
+                            linkedin,
+                            github,
 
-                        /*
-                         * IMPORTANT:
-                         * No predefined company or role.
-                         */
-                        target_company: "",
-                        target_role: ""
+                            /*
+                             * No predefined company
+                             * or role.
+                             */
+                            target_company: "",
+                            target_role: ""
+                        }
+                    );
+
+                /*
+                 * Existing-account detection.
+                 *
+                 * This handles both:
+                 * ACCOUNT_EXISTS
+                 * ALREADY_EXISTS
+                 * duplicate
+                 * already registered
+                 * email already exists
+                 */
+                const responseText =
+                    JSON.stringify(
+                        result || {}
+                    ).toLowerCase();
+
+                const accountExists =
+                    result?.status ===
+                        "ACCOUNT_EXISTS" ||
+
+                    result?.status ===
+                        "ALREADY_EXISTS" ||
+
+                    result?.code ===
+                        "ACCOUNT_EXISTS" ||
+
+                    result?.code ===
+                        "ALREADY_EXISTS" ||
+
+                    responseText.includes(
+                        "account already exists"
+                    ) ||
+
+                    responseText.includes(
+                        "email already exists"
+                    ) ||
+
+                    responseText.includes(
+                        "already registered"
+                    ) ||
+
+                    responseText.includes(
+                        "already exist"
+                    ) ||
+
+                    responseText.includes(
+                        "duplicate"
+                    );
+
+                if (accountExists) {
+                    showMessage(
+                        errorMessage,
+                        result.message ||
+                        "An account with this email already exists."
+                    );
+
+                    await showWarningPopup(
+                        "Account Already Exists",
+                        "An account with this email already exists. Please log in using your existing account."
+                    );
+
+                    const loginTab =
+                        $("login-tab") ||
+                        $("tab-btn-login") ||
+                        qs(
+                            "[data-auth-tab='login']"
+                        );
+
+                    if (loginTab) {
+                        loginTab.click();
                     }
-                );
+
+                    return;
+                }
 
                 if (apiSuccess(result)) {
                     showMessage(
                         successMessage,
                         result.message ||
-                        "Account created successfully. You can now log in.",
+                        "Account registered successfully.",
                         "success"
                     );
 
                     if (errorMessage) {
-                        errorMessage.style.display = "none";
+                        errorMessage.style.display =
+                            "none";
                     }
 
-                    setTimeout(() => {
-                        const loginTab =
-                            $("login-tab") ||
-                            $("tab-btn-login");
+                    /*
+                     * Important:
+                     * Do NOT automatically reload the page.
+                     * Show the popup first.
+                     */
+                    await showSuccessPopup(
+                        "Account Registered Successfully",
+                        "Your account has been created successfully. You can now log in."
+                    );
 
-                        if (loginTab) {
-                            loginTab.click();
-                        }
-                    }, 1200);
+                    /*
+                     * Move to login after popup.
+                     */
+                    const loginTab =
+                        $("login-tab") ||
+                        $("tab-btn-login") ||
+                        qs(
+                            "[data-auth-tab='login']"
+                        );
+
+                    if (loginTab) {
+                        loginTab.click();
+                    }
+
+                    /*
+                     * Clear password and terms.
+                     */
+                    passwordInput.value = "";
+
+                    if (termsInput) {
+                        termsInput.checked = false;
+                    }
 
                     return;
                 }
 
-                showMessage(
-                    errorMessage,
+                const message =
                     result.message ||
-                    "Unable to create account."
-                );
-            } catch (error) {
-                console.error(error);
+                    "Unable to create account.";
 
                 showMessage(
                     errorMessage,
-                    "Registration failed. Please try again."
+                    message
+                );
+
+                await showErrorPopup(
+                    "Registration Failed",
+                    message
+                );
+            } catch (error) {
+                console.error(
+                    "Signup error:",
+                    error
+                );
+
+                const message =
+                    "Registration failed. Please try again.";
+
+                showMessage(
+                    errorMessage,
+                    message
+                );
+
+                await showErrorPopup(
+                    "Registration Failed",
+                    message
                 );
             } finally {
                 setLoading(
@@ -673,28 +1345,51 @@
 
     function initPasswordToggles() {
         const togglePairs = [
-            ["toggle-login-password", "login_password"],
-            ["toggle-signup-password", "signup_pwd"]
+            [
+                "toggle-login-password",
+                "login_password"
+            ],
+            [
+                "toggle-signup-password",
+                "signup_pwd"
+            ]
         ];
 
-        togglePairs.forEach(([buttonId, inputId]) => {
-            const button = $(buttonId);
-            const input = $(inputId);
+        togglePairs.forEach(
+            ([buttonId, inputId]) => {
+                const button =
+                    $(buttonId);
 
-            if (!button || !input) {
-                return;
-            }
+                const input =
+                    $(inputId);
 
-            button.addEventListener("click", () => {
-                if (input.type === "password") {
-                    input.type = "text";
-                    button.textContent = "🙈";
-                } else {
-                    input.type = "password";
-                    button.textContent = "👁️";
+                if (!button || !input) {
+                    return;
                 }
-            });
-        });
+
+                button.addEventListener(
+                    "click",
+                    () => {
+                        if (
+                            input.type ===
+                            "password"
+                        ) {
+                            input.type =
+                                "text";
+
+                            button.textContent =
+                                "🙈";
+                        } else {
+                            input.type =
+                                "password";
+
+                            button.textContent =
+                                "👁️";
+                        }
+                    }
+                );
+            }
+        );
     }
 
     /* ============================================================
@@ -702,10 +1397,25 @@
        ============================================================ */
 
     function applyTheme(theme) {
-        const isDark = theme === "dark";
+        const isDark =
+            theme === "dark";
+
+        /*
+         * Support both the current CSS
+         * (dark-mode) and older CSS (dark).
+         */
+        document.body.classList.toggle(
+            "dark-mode",
+            isDark
+        );
 
         document.body.classList.toggle(
             "dark",
+            isDark
+        );
+
+        document.documentElement.classList.toggle(
+            "dark-mode",
             isDark
         );
 
@@ -715,60 +1425,96 @@
         );
 
         document.documentElement.dataset.theme =
-            isDark ? "dark" : "light";
+            isDark
+                ? "dark"
+                : "light";
 
-        const icon = $("theme-icon");
-        const textElement = $("theme-text");
+        const icon =
+            $("theme-icon");
+
+        const textElement =
+            $("theme-text");
 
         if (icon) {
             icon.textContent =
-                isDark ? "☀️" : "🌙";
+                isDark
+                    ? "☀️"
+                    : "🌙";
         }
 
         if (textElement) {
             textElement.textContent =
-                isDark ? "Light" : "Dark";
+                isDark
+                    ? "Light"
+                    : "Dark";
         }
     }
 
     function initTheme() {
         const savedTheme =
-            localStorage.getItem("sgp-theme");
+            localStorage.getItem(
+                "sgp-theme"
+            );
 
         const initialTheme =
             savedTheme === "dark"
                 ? "dark"
                 : "light";
 
-        applyTheme(initialTheme);
+        applyTheme(
+            initialTheme
+        );
 
         const toggleButtons = [];
 
         [
             $("theme-toggle"),
             $("top-theme-toggle")
-        ].forEach((button) => {
-            if (button && !toggleButtons.includes(button)) {
-                toggleButtons.push(button);
+        ].forEach(
+            (button) => {
+                if (
+                    button &&
+                    !toggleButtons.includes(
+                        button
+                    )
+                ) {
+                    toggleButtons.push(
+                        button
+                    );
+                }
             }
-        });
+        );
 
-        toggleButtons.forEach((button) => {
-            button.addEventListener("click", () => {
-                const isDark =
-                    document.body.classList.contains("dark");
+        toggleButtons.forEach(
+            (button) => {
+                button.addEventListener(
+                    "click",
+                    () => {
+                        const isDark =
+                            document.body.classList.contains(
+                                "dark-mode"
+                            ) ||
+                            document.body.classList.contains(
+                                "dark"
+                            );
 
-                const nextTheme =
-                    isDark ? "light" : "dark";
+                        const nextTheme =
+                            isDark
+                                ? "light"
+                                : "dark";
 
-                localStorage.setItem(
-                    "sgp-theme",
-                    nextTheme
+                        localStorage.setItem(
+                            "sgp-theme",
+                            nextTheme
+                        );
+
+                        applyTheme(
+                            nextTheme
+                        );
+                    }
                 );
-
-                applyTheme(nextTheme);
-            });
-        });
+            }
+        );
     }
 
     /* ============================================================
@@ -776,7 +1522,9 @@
        ============================================================ */
 
     function initSidebar() {
-        const sidebar = qs(".sidebar");
+        const sidebar =
+            qs(".sidebar") ||
+            qs(".app-sidebar");
 
         const menuButtons = [
             $("mobile-menu-toggle"),
@@ -815,18 +1563,27 @@
             }
         }
 
-        menuButtons.forEach((button) => {
-            button.addEventListener("click", () => {
-                if (
-                    sidebar.classList.contains("open") ||
-                    sidebar.classList.contains("active")
-                ) {
-                    closeSidebar();
-                } else {
-                    openSidebar();
-                }
-            });
-        });
+        menuButtons.forEach(
+            (button) => {
+                button.addEventListener(
+                    "click",
+                    () => {
+                        if (
+                            sidebar.classList.contains(
+                                "open"
+                            ) ||
+                            sidebar.classList.contains(
+                                "active"
+                            )
+                        ) {
+                            closeSidebar();
+                        } else {
+                            openSidebar();
+                        }
+                    }
+                );
+            }
+        );
 
         if (closeButton) {
             closeButton.addEventListener(
@@ -842,11 +1599,17 @@
             );
         }
 
-        window.addEventListener("resize", () => {
-            if (window.innerWidth > 800) {
-                closeSidebar();
+        window.addEventListener(
+            "resize",
+            () => {
+                if (
+                    window.innerWidth >
+                    800
+                ) {
+                    closeSidebar();
+                }
             }
-        });
+        );
     }
 
     /* ============================================================
@@ -864,98 +1627,149 @@
             return;
         }
 
-        function showView(viewId, clickedItem = null) {
-            views.forEach((view) => {
-                view.style.display = "none";
-                view.classList.remove("active");
-            });
+        function showView(
+            viewId,
+            clickedItem = null
+        ) {
+            views.forEach(
+                (view) => {
+                    view.style.display =
+                        "none";
 
-            navItems.forEach((item) => {
-                item.classList.remove("active");
-            });
+                    view.classList.remove(
+                        "active"
+                    );
+                }
+            );
+
+            navItems.forEach(
+                (item) => {
+                    item.classList.remove(
+                        "active"
+                    );
+                }
+            );
 
             const target =
                 $(viewId);
 
             if (target) {
-                target.style.display = "block";
-                target.classList.add("active");
+                target.style.display =
+                    "block";
+
+                target.classList.add(
+                    "active"
+                );
             }
 
             if (clickedItem) {
-                clickedItem.classList.add("active");
+                clickedItem.classList.add(
+                    "active"
+                );
             }
 
-            if (viewId === "view-roadmap") {
+            if (
+                viewId ===
+                "view-roadmap"
+            ) {
                 loadDynamicRoadmap();
             }
 
-            if (viewId === "view-interview") {
+            if (
+                viewId ===
+                "view-interview"
+            ) {
                 loadDynamicInterview();
             }
 
-            if (viewId === "view-analytics") {
+            if (
+                viewId ===
+                "view-analytics"
+            ) {
                 loadMetrics();
             }
 
             const sidebar =
-                qs(".sidebar");
+                qs(".sidebar") ||
+                qs(".app-sidebar");
 
             if (
                 sidebar &&
                 window.innerWidth <= 800
             ) {
-                sidebar.classList.remove("open");
-                sidebar.classList.remove("active");
+                sidebar.classList.remove(
+                    "open"
+                );
+
+                sidebar.classList.remove(
+                    "active"
+                );
             }
         }
 
-        navItems.forEach((item) => {
-            item.addEventListener("click", (event) => {
-                event.preventDefault();
+        navItems.forEach(
+            (item) => {
+                item.addEventListener(
+                    "click",
+                    (event) => {
+                        event.preventDefault();
 
-                const viewId =
-                    item.getAttribute("data-view");
-
-                if (viewId) {
-                    showView(
-                        viewId,
-                        item
-                    );
-                }
-            });
-        });
-
-        qsa("[data-open-view]").forEach((button) => {
-            button.addEventListener("click", () => {
-                const view =
-                    button.getAttribute(
-                        "data-open-view"
-                    );
-
-                if (!view) {
-                    return;
-                }
-
-                const viewId =
-                    view.startsWith("view-")
-                        ? view
-                        : `view-${view}`;
-
-                const matchingNav =
-                    navItems.find(
-                        (item) =>
+                        const viewId =
                             item.getAttribute(
                                 "data-view"
-                            ) === viewId
-                    );
+                            );
 
-                showView(
-                    viewId,
-                    matchingNav || null
+                        if (viewId) {
+                            showView(
+                                viewId,
+                                item
+                            );
+                        }
+                    }
                 );
-            });
-        });
+            }
+        );
+
+        qsa(
+            "[data-open-view]"
+        ).forEach(
+            (button) => {
+                button.addEventListener(
+                    "click",
+                    () => {
+                        const view =
+                            button.getAttribute(
+                                "data-open-view"
+                            );
+
+                        if (!view) {
+                            return;
+                        }
+
+                        const viewId =
+                            view.startsWith(
+                                "view-"
+                            )
+                                ? view
+                                : `view-${view}`;
+
+                        const matchingNav =
+                            navItems.find(
+                                (item) =>
+                                    item.getAttribute(
+                                        "data-view"
+                                    ) === viewId
+                            );
+
+                        showView(
+                            viewId,
+                            matchingNav ||
+                                null
+                        );
+                    }
+                );
+            }
+        );
     }
 
     /* ============================================================
@@ -972,11 +1786,16 @@
             "#career-url-section",
             "#career-target-section",
             "#career-target-card"
-        ].forEach((selector) => {
-            qsa(selector).forEach((element) => {
-                element.style.display = "none";
-            });
-        });
+        ].forEach(
+            (selector) => {
+                qsa(selector).forEach(
+                    (element) => {
+                        element.style.display =
+                            "none";
+                    }
+                );
+            }
+        );
     }
 
     /* ============================================================
@@ -1035,18 +1854,22 @@
             input.value.trim();
 
         if (!url) {
-            alert(
+            await showErrorPopup(
+                "Career URL Required",
                 "Please enter a career or jobs URL."
             );
+
             return;
         }
 
         if (
             !/^https?:\/\//i.test(url)
         ) {
-            alert(
+            await showErrorPopup(
+                "Invalid URL",
                 "Please enter a valid URL beginning with http:// or https://"
             );
+
             return;
         }
 
@@ -1066,21 +1889,68 @@
                 );
 
             if (!apiSuccess(result)) {
-                alert(
+                await showErrorPopup(
+                    "Job Extraction Failed",
                     result.message ||
                     "Unable to analyze this URL."
                 );
+
                 return;
             }
 
-            state.careerUrl = url;
+            state.careerUrl =
+                url;
 
-            if (Array.isArray(result.jobs)) {
+            /*
+             * IMPORTANT FIX:
+             *
+             * Different backend versions may
+             * return jobs in different locations.
+             */
+            const extractedJobs =
+                extractJobsFromResponse(
+                    result
+                );
+
+            const reportedCount =
+                extractJobCountFromResponse(
+                    result
+                );
+
+            if (extractedJobs.length) {
                 state.careerJobs =
                     normalizeJobs(
-                        result.jobs
+                        extractedJobs
                     );
+
+                state.careerJobCount =
+                    state.careerJobs.length;
+            } else if (
+                reportedCount > 0
+            ) {
+                /*
+                 * Keep the reported count if the
+                 * backend returns the count but
+                 * does not expose the array.
+                 */
+                state.careerJobCount =
+                    reportedCount;
+            } else {
+                state.careerJobs = [];
+                state.careerJobCount = 0;
             }
+
+            /*
+             * Keep APP_DATA synchronized.
+             */
+            window.APP_DATA =
+                window.APP_DATA || {};
+
+            window.APP_DATA.careerJobs =
+                state.careerJobs;
+
+            window.APP_DATA.careerJobCount =
+                state.careerJobCount;
 
             if (
                 Array.isArray(
@@ -1091,22 +1961,64 @@
                     normalizeSkills(
                         result.required_skills
                     );
+            } else if (
+                Array.isArray(
+                    result.data?.required_skills
+                )
+            ) {
+                state.requiredSkills =
+                    normalizeSkills(
+                        result.data.required_skills
+                    );
             }
 
-            if (result.recommended_job) {
+            if (
+                result.recommended_job
+            ) {
                 state.recommendedJob =
                     result.recommended_job;
+            } else if (
+                result.data?.recommended_job
+            ) {
+                state.recommendedJob =
+                    result.data.recommended_job;
             }
 
+            /*
+             * Render jobs BEFORE loading metrics.
+             */
             renderJobs();
+
             updateTargetUI();
+
+            /*
+             * This is the important dashboard
+             * count fix.
+             */
             updateStats();
 
+            /*
+             * Metrics can refresh ATS/skills,
+             * but local extracted job count is
+             * preserved.
+             */
             await loadMetrics();
 
-            alert(
+            /*
+             * Update again after metrics.
+             */
+            updateStats();
+
+            const finalCount =
+                state.careerJobs.length ||
+                state.careerJobCount ||
+                reportedCount ||
+                0;
+
+            await showSuccessPopup(
+                "Jobs Extracted Successfully",
                 result.message ||
-                `Successfully analyzed ${state.careerJobs.length} job posting(s).`
+                `${finalCount} job(s) extracted successfully from the career source.`
             );
         } catch (error) {
             console.error(
@@ -1114,7 +2026,8 @@
                 error
             );
 
-            alert(
+            await showErrorPopup(
+                "Connection Error",
                 "Unable to connect to the career URL service."
             );
         } finally {
@@ -1130,7 +2043,10 @@
        ============================================================ */
 
     function normalizeJob(job) {
-        if (!job || typeof job !== "object") {
+        if (
+            !job ||
+            typeof job !== "object"
+        ) {
             return null;
         }
 
@@ -1139,6 +2055,7 @@
                 job.required_skills ||
                 job.skills ||
                 job.requirements ||
+                job.technical_skills ||
                 []
             );
 
@@ -1152,25 +2069,32 @@
                 job.title ||
                 job.role ||
                 job.job_title ||
+                job.position ||
+                job.name ||
                 "Job Opportunity",
 
             company:
                 job.company ||
                 job.company_name ||
+                job.employer ||
                 "",
 
             location:
                 job.location ||
+                job.locations ||
                 "",
 
             url:
                 job.url ||
                 job.link ||
                 job.job_url ||
+                job.apply_url ||
                 "",
 
             description:
                 job.description ||
+                job.summary ||
+                job.text ||
                 "",
 
             skills
@@ -1221,7 +2145,9 @@
             required.filter(
                 (skill) =>
                     resumeSet.has(
-                        normalizeSkill(skill)
+                        normalizeSkill(
+                            skill
+                        )
                     )
             );
 
@@ -1229,15 +2155,18 @@
             required.filter(
                 (skill) =>
                     !resumeSet.has(
-                        normalizeSkill(skill)
+                        normalizeSkill(
+                            skill
+                        )
                     )
             );
 
         const score =
             Math.round(
-                (matched.length /
-                    required.length) *
-                    100
+                (
+                    matched.length /
+                    required.length
+                ) * 100
             );
 
         return {
@@ -1249,20 +2178,27 @@
 
     function rankJobs(jobs) {
         return jobs
-            .map((job) => {
-                const match =
-                    calculateJobMatch(job);
+            .map(
+                (job) => {
+                    const match =
+                        calculateJobMatch(
+                            job
+                        );
 
-                return {
-                    ...job,
-                    matchScore:
-                        match.score,
-                    matchedSkills:
-                        match.matched,
-                    missingSkills:
-                        match.missing
-                };
-            })
+                    return {
+                        ...job,
+
+                        matchScore:
+                            match.score,
+
+                        matchedSkills:
+                            match.matched,
+
+                        missingSkills:
+                            match.missing
+                    };
+                }
+            )
             .sort(
                 (a, b) =>
                     b.matchScore -
@@ -1285,7 +2221,8 @@
 
         if (!state.careerJobs.length) {
             if (
-                container.tagName === "TBODY"
+                container.tagName ===
+                "TBODY"
             ) {
                 container.innerHTML = `
                     <tr>
@@ -1297,16 +2234,24 @@
             } else {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">💼</div>
+                        <div class="empty-state-icon">
+                            💼
+                        </div>
+
                         <div class="empty-state-title">
                             No jobs analyzed yet
                         </div>
+
                         <div class="empty-state-text">
                             Enter a career URL and analyze available jobs.
                         </div>
                     </div>
                 `;
             }
+
+            updateRecommendation(
+                null
+            );
 
             return;
         }
@@ -1317,171 +2262,218 @@
             );
 
         if (
-            container.tagName === "TBODY"
+            container.tagName ===
+            "TBODY"
         ) {
             container.innerHTML =
                 ranked
-                    .map((job) => `
-                        <tr>
-                            <td>
-                                <strong>
-                                    ${escapeHtml(job.company)}
-                                </strong>
-                            </td>
-                            <td>
-                                ${escapeHtml(job.title)}
-                            </td>
-                            <td>
-                                ${escapeHtml(job.location)}
-                            </td>
-                            <td>
-                                <strong>
-                                    ${job.matchScore}%
-                                </strong>
-                            </td>
-                            <td>
-                                ${job.matchedSkills.length}
-                                /
-                                ${
-                                    job.matchedSkills.length +
-                                    job.missingSkills.length
-                                }
-                            </td>
-                            <td>
-                                ${job.matchScore >= 70
-                                    ? "High Match"
-                                    : job.matchScore >= 40
-                                        ? "Moderate Match"
-                                        : "Low Match"}
-                            </td>
-                            <td>
-                                ${
-                                    job.missingSkills.length
-                                        ? escapeHtml(
-                                            job.missingSkills.join(", ")
-                                        )
-                                        : "None"
-                                }
-                            </td>
-                        </tr>
-                    `)
+                    .map(
+                        (job) => `
+                            <tr>
+                                <td>
+                                    <strong>
+                                        ${escapeHtml(
+                                            job.company
+                                        )}
+                                    </strong>
+                                </td>
+
+                                <td>
+                                    ${escapeHtml(
+                                        job.title
+                                    )}
+                                </td>
+
+                                <td>
+                                    ${escapeHtml(
+                                        job.location
+                                    )}
+                                </td>
+
+                                <td>
+                                    <strong>
+                                        ${job.matchScore}%
+                                    </strong>
+                                </td>
+
+                                <td>
+                                    ${job.matchedSkills.length}
+                                    /
+                                    ${
+                                        job.matchedSkills.length +
+                                        job.missingSkills.length
+                                    }
+                                </td>
+
+                                <td>
+                                    ${
+                                        job.matchScore >=
+                                        70
+                                            ? "High Match"
+                                            : job.matchScore >=
+                                              40
+                                                ? "Moderate Match"
+                                                : "Low Match"
+                                    }
+                                </td>
+
+                                <td>
+                                    ${
+                                        job.missingSkills.length
+                                            ? escapeHtml(
+                                                job.missingSkills.join(
+                                                    ", "
+                                                )
+                                            )
+                                            : "None"
+                                    }
+                                </td>
+                            </tr>
+                        `
+                    )
                     .join("");
+
+            updateRecommendation(
+                ranked[0] || null
+            );
 
             return;
         }
 
         container.innerHTML =
             ranked
-                .map((job, index) => `
-                    <article class="job-card">
-                        <div style="
-                            display:flex;
-                            justify-content:space-between;
-                            gap:15px;
-                            align-items:flex-start;
-                        ">
-                            <div>
-                                <div class="job-title">
-                                    ${escapeHtml(job.title)}
+                .map(
+                    (job) => `
+                        <article class="job-card">
+                            <div style="
+                                display:flex;
+                                justify-content:space-between;
+                                gap:15px;
+                                align-items:flex-start;
+                            ">
+                                <div>
+                                    <div class="job-title">
+                                        ${escapeHtml(
+                                            job.title
+                                        )}
+                                    </div>
+
+                                    <div class="job-company">
+                                        ${escapeHtml(
+                                            job.company
+                                        )}
+                                    </div>
+
+                                    ${
+                                        job.location
+                                            ? `
+                                                <div class="job-location">
+                                                    📍
+                                                    ${escapeHtml(
+                                                        job.location
+                                                    )}
+                                                </div>
+                                            `
+                                            : ""
+                                    }
                                 </div>
 
-                                <div class="job-company">
-                                    ${escapeHtml(job.company)}
-                                </div>
-
-                                ${
-                                    job.location
-                                        ? `
-                                            <div class="job-location">
-                                                📍
-                                                ${escapeHtml(job.location)}
-                                            </div>
-                                        `
-                                        : ""
-                                }
+                                <span class="match-score">
+                                    ${job.matchScore}% Match
+                                </span>
                             </div>
 
-                            <span class="match-score">
-                                ${job.matchScore}% Match
-                            </span>
-                        </div>
+                            ${
+                                job.matchedSkills.length
+                                    ? `
+                                        <div style="margin-top:14px;">
+                                            <strong>
+                                                Matched Skills
+                                            </strong>
 
-                        ${
-                            job.matchedSkills.length
-                                ? `
-                                    <div style="margin-top:14px;">
-                                        <strong>
-                                            Matched Skills
-                                        </strong>
-
-                                        <div class="skills-container"
-                                             style="margin-top:8px;">
-                                            ${job.matchedSkills
-                                                .map(
-                                                    (skill) =>
-                                                        `<span class="skill-tag-matched">
-                                                            ${escapeHtml(skill)}
-                                                        </span>`
-                                                )
-                                                .join("")}
+                                            <div
+                                                class="skills-container"
+                                                style="margin-top:8px;"
+                                            >
+                                                ${job.matchedSkills
+                                                    .map(
+                                                        (skill) =>
+                                                            `<span class="skill-tag-matched">
+                                                                ${escapeHtml(
+                                                                    skill
+                                                                )}
+                                                            </span>`
+                                                    )
+                                                    .join("")}
+                                            </div>
                                         </div>
-                                    </div>
-                                `
-                                : ""
-                        }
+                                    `
+                                    : ""
+                            }
 
-                        ${
-                            job.missingSkills.length
-                                ? `
-                                    <div style="margin-top:14px;">
-                                        <strong>
-                                            Skill Gaps
-                                        </strong>
+                            ${
+                                job.missingSkills.length
+                                    ? `
+                                        <div style="margin-top:14px;">
+                                            <strong>
+                                                Skill Gaps
+                                            </strong>
 
-                                        <div class="skills-container"
-                                             style="margin-top:8px;">
-                                            ${job.missingSkills
-                                                .map(
-                                                    (skill) =>
-                                                        `<span class="skill-tag-missing">
-                                                            ${escapeHtml(skill)}
-                                                        </span>`
-                                                )
-                                                .join("")}
+                                            <div
+                                                class="skills-container"
+                                                style="margin-top:8px;"
+                                            >
+                                                ${job.missingSkills
+                                                    .map(
+                                                        (skill) =>
+                                                            `<span class="skill-tag-missing">
+                                                                ${escapeHtml(
+                                                                    skill
+                                                                )}
+                                                            </span>`
+                                                    )
+                                                    .join("")}
+                                            </div>
                                         </div>
-                                    </div>
-                                `
-                                : ""
-                        }
+                                    `
+                                    : ""
+                            }
 
-                        ${
-                            job.url
-                                ? `
-                                    <div style="margin-top:15px;">
-                                        <a
-                                            href="${escapeHtml(job.url)}"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            class="btn btn-sm"
-                                        >
-                                            View Job
-                                        </a>
-                                    </div>
-                                `
-                                : ""
-                        }
-                    </article>
-                `)
+                            ${
+                                job.url
+                                    ? `
+                                        <div style="margin-top:15px;">
+                                            <a
+                                                href="${escapeHtml(
+                                                    job.url
+                                                )}"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="btn btn-sm"
+                                            >
+                                                View Job
+                                            </a>
+                                        </div>
+                                    `
+                                    : ""
+                            }
+                        </article>
+                    `
+                )
                 .join("");
 
-        updateRecommendation(ranked[0]);
+        updateRecommendation(
+            ranked[0] || null
+        );
     }
 
     /* ============================================================
        RECOMMENDATION
        ============================================================ */
 
-    function updateRecommendation(job = null) {
+    function updateRecommendation(
+        job = null
+    ) {
         const card =
             $("recommendation-card") ||
             $("recommended-job") ||
@@ -1498,6 +2490,7 @@
                     <div class="empty-state-title">
                         No career recommendation yet
                     </div>
+
                     <div class="empty-state-text">
                         Analyze a career URL and upload your resume first.
                     </div>
@@ -1507,7 +2500,8 @@
             return;
         }
 
-        state.recommendedJob = job;
+        state.recommendedJob =
+            job;
 
         card.innerHTML = `
             <div class="recommendation-title">
@@ -1515,7 +2509,9 @@
             </div>
 
             <div class="recommendation-role">
-                ${escapeHtml(job.title)}
+                ${escapeHtml(
+                    job.title
+                )}
             </div>
 
             ${
@@ -1525,7 +2521,9 @@
                             margin-top:4px;
                             color:var(--text-muted);
                         ">
-                            ${escapeHtml(job.company)}
+                            ${escapeHtml(
+                                job.company
+                            )}
                         </div>
                     `
                     : ""
@@ -1541,15 +2539,21 @@
                 job.matchedSkills.length
                     ? `
                         <div style="margin-top:15px;">
-                            <strong>Matched Skills</strong>
+                            <strong>
+                                Matched Skills
+                            </strong>
 
-                            <div class="skills-container"
-                                 style="margin-top:8px;">
+                            <div
+                                class="skills-container"
+                                style="margin-top:8px;"
+                            >
                                 ${job.matchedSkills
                                     .map(
                                         (skill) =>
                                             `<span class="skill-tag-matched">
-                                                ${escapeHtml(skill)}
+                                                ${escapeHtml(
+                                                    skill
+                                                )}
                                             </span>`
                                     )
                                     .join("")}
@@ -1563,15 +2567,21 @@
                 job.missingSkills.length
                     ? `
                         <div style="margin-top:15px;">
-                            <strong>Skills to Develop</strong>
+                            <strong>
+                                Skills to Develop
+                            </strong>
 
-                            <div class="skills-container"
-                                 style="margin-top:8px;">
+                            <div
+                                class="skills-container"
+                                style="margin-top:8px;"
+                            >
                                 ${job.missingSkills
                                     .map(
                                         (skill) =>
                                             `<span class="skill-tag-missing">
-                                                ${escapeHtml(skill)}
+                                                ${escapeHtml(
+                                                    skill
+                                                )}
                                             </span>`
                                     )
                                     .join("")}
@@ -1604,7 +2614,9 @@
         input.addEventListener(
             "change",
             () => {
-                if (input.files.length) {
+                if (
+                    input.files.length
+                ) {
                     uploadResume(
                         input.files[0],
                         evaluateButton
@@ -1618,7 +2630,10 @@
                 "dragover",
                 (event) => {
                     event.preventDefault();
-                    dropZone.classList.add("drag-over");
+
+                    dropZone.classList.add(
+                        "drag-over"
+                    );
                 }
             );
 
@@ -1657,13 +2672,16 @@
             evaluateButton.addEventListener(
                 "click",
                 () => {
-                    if (input.files.length) {
+                    if (
+                        input.files.length
+                    ) {
                         uploadResume(
                             input.files[0],
                             evaluateButton
                         );
                     } else {
-                        alert(
+                        showErrorPopup(
+                            "Resume Required",
                             "Please select a resume first."
                         );
                     }
@@ -1680,12 +2698,11 @@
             return;
         }
 
-        const allowed =
-            [
-                "application/pdf",
-                "application/msword",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            ];
+        const allowed = [
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ];
 
         const extension =
             file.name
@@ -1694,12 +2711,19 @@
                 .toLowerCase();
 
         if (
-            !allowed.includes(file.type) &&
-            !["pdf", "doc", "docx"].includes(
+            !allowed.includes(
+                file.type
+            ) &&
+            ![
+                "pdf",
+                "doc",
+                "docx"
+            ].includes(
                 extension
             )
         ) {
-            alert(
+            await showErrorPopup(
+                "Invalid Resume",
                 "Please upload a PDF, DOC, or DOCX resume."
             );
 
@@ -1735,7 +2759,8 @@
                 );
 
             if (!apiSuccess(result)) {
-                alert(
+                await showErrorPopup(
+                    "Resume Analysis Failed",
                     result.message ||
                     "Resume analysis failed."
                 );
@@ -1755,7 +2780,8 @@
             }
 
             if (
-                result.ats_score !== undefined
+                result.ats_score !==
+                undefined
             ) {
                 state.atsScore =
                     Number(
@@ -1781,9 +2807,12 @@
 
             await loadMetrics();
 
-            alert(
+            updateStats();
+
+            await showSuccessPopup(
+                "Resume Analyzed Successfully",
                 result.message ||
-                "Resume analyzed successfully."
+                "Your resume has been analyzed successfully."
             );
         } catch (error) {
             console.error(
@@ -1791,7 +2820,8 @@
                 error
             );
 
-            alert(
+            await showErrorPopup(
+                "Resume Analysis Error",
                 "Unable to analyze the resume."
             );
         } finally {
@@ -1831,7 +2861,9 @@
                     .map(
                         (skill) =>
                             `<span class="skill-tag-matched">
-                                ${escapeHtml(skill)}
+                                ${escapeHtml(
+                                    skill
+                                )}
                             </span>`
                     )
                     .join("")
@@ -1860,7 +2892,8 @@
                 Math.min(
                     100,
                     Number(
-                        state.atsScore || 0
+                        state.atsScore ||
+                        0
                     )
                 )
             );
@@ -1872,10 +2905,14 @@
             $("ats-score-value")
         ]
             .filter(Boolean)
-            .forEach((element) => {
-                element.textContent =
-                    `${Math.round(score)}`;
-            });
+            .forEach(
+                (element) => {
+                    element.textContent =
+                        `${Math.round(
+                            score
+                        )}`;
+                }
+            );
 
         const circle =
             $(".ats-circle");
@@ -1903,7 +2940,10 @@
             $("banner-company-role");
 
         if (title) {
-            if (company && role) {
+            if (
+                company &&
+                role
+            ) {
                 title.textContent =
                     `${company} · ${role}`;
             } else if (role) {
@@ -1924,11 +2964,13 @@
             $("profile-target-company")
         ]
             .filter(Boolean)
-            .forEach((element) => {
-                element.textContent =
-                    company ||
-                    "Not selected";
-            });
+            .forEach(
+                (element) => {
+                    element.textContent =
+                        company ||
+                        "Not selected";
+                }
+            );
 
         [
             $("target-role"),
@@ -1936,11 +2978,13 @@
             $("profile-target-role")
         ]
             .filter(Boolean)
-            .forEach((element) => {
-                element.textContent =
-                    role ||
-                    "Not selected";
-            });
+            .forEach(
+                (element) => {
+                    element.textContent =
+                        role ||
+                        "Not selected";
+                }
+            );
     }
 
     /* ============================================================
@@ -1973,7 +3017,8 @@
                 window.LATEST_METRICS;
 
             if (
-                metrics.ats_score !== undefined
+                metrics.ats_score !==
+                undefined
             ) {
                 state.atsScore =
                     Number(
@@ -2003,8 +3048,35 @@
                     );
             }
 
+            /*
+             * Do not overwrite the locally
+             * extracted job list with an old
+             * backend count.
+             */
+            const backendJobCount =
+                Number(
+                    metrics.job_count ??
+                    metrics.jobs_count ??
+                    metrics.total_jobs ??
+                    0
+                );
+
+            if (
+                !state.careerJobs.length &&
+                backendJobCount > 0
+            ) {
+                state.careerJobCount =
+                    backendJobCount;
+            }
+
             renderATS();
+
             renderExtractedSkills();
+
+            /*
+             * updateStats() now preserves
+             * locally extracted jobs.
+             */
             updateStats();
 
             renderMetricSkills(
@@ -2018,7 +3090,9 @@
         }
     }
 
-    function renderMetricSkills(metrics) {
+    function renderMetricSkills(
+        metrics
+    ) {
         const matched =
             Array.isArray(
                 metrics.matched_skills
@@ -2046,7 +3120,9 @@
                         .map(
                             (skill) =>
                                 `<span class="skill-tag-matched">
-                                    ${escapeHtml(skill)}
+                                    ${escapeHtml(
+                                        skill
+                                    )}
                                 </span>`
                         )
                         .join("")
@@ -2064,7 +3140,9 @@
                         .map(
                             (skill) =>
                                 `<span class="skill-tag-missing">
-                                    ${escapeHtml(skill)}
+                                    ${escapeHtml(
+                                        skill
+                                    )}
                                 </span>`
                         )
                         .join("")
@@ -2076,6 +3154,10 @@
         }
     }
 
+    /* ============================================================
+       DASHBOARD STATS
+       ============================================================ */
+
     function updateStats() {
         const ranked =
             rankJobs(
@@ -2085,7 +3167,20 @@
         const bestMatch =
             ranked.length
                 ? ranked[0].matchScore
-                : 0;
+                : (
+                    state.recommendedJob &&
+                    state.recommendedJob.matchScore !==
+                        undefined
+                )
+                    ? Number(
+                        state.recommendedJob.matchScore
+                    )
+                    : 0;
+
+        const actualJobCount =
+            state.careerJobs.length ||
+            state.careerJobCount ||
+            0;
 
         const values = {
             "stat-skills":
@@ -2097,16 +3192,38 @@
                 ),
 
             "stat-jobs":
-                state.careerJobs.length,
+                actualJobCount,
 
             "stat-match":
-                bestMatch
+                bestMatch,
+
+            /*
+             * Dashboard metric IDs.
+             *
+             * This was missing in the previous
+             * version and caused the dashboard
+             * to continue displaying 0.
+             */
+            "metric-ats":
+                Math.round(
+                    state.atsScore || 0
+                ),
+
+            "metric-jobs":
+                actualJobCount,
+
+            "metric-match":
+                bestMatch,
+
+            "metric-readiness":
+                calculateReadiness()
         };
 
         Object.entries(values)
             .forEach(
                 ([id, value]) => {
-                    const element = $(id);
+                    const element =
+                        $(id);
 
                     if (element) {
                         element.textContent =
@@ -2114,6 +3231,39 @@
                     }
                 }
             );
+    }
+
+    function calculateReadiness() {
+        const ats =
+            Number(
+                state.atsScore || 0
+            );
+
+        const jobs =
+            state.careerJobs;
+
+        if (!jobs.length) {
+            return Math.round(
+                ats
+            );
+        }
+
+        const ranked =
+            rankJobs(
+                jobs
+            );
+
+        const bestMatch =
+            ranked.length
+                ? ranked[0].matchScore
+                : 0;
+
+        /*
+         * Balanced readiness value.
+         */
+        return Math.round(
+            (ats + bestMatch) / 2
+        );
     }
 
     /* ============================================================
@@ -2145,10 +3295,12 @@
                         url;
 
                     await scrapeCareerUrl();
+
                     return;
                 }
 
                 renderJobs();
+                updateStats();
             }
         );
     }
@@ -2170,7 +3322,8 @@
         }
 
         const metrics =
-            window.LATEST_METRICS || {};
+            window.LATEST_METRICS ||
+            {};
 
         const missingSkills =
             Array.isArray(
@@ -2180,9 +3333,13 @@
                 : state.requiredSkills.filter(
                     (skill) =>
                         !state.extractedSkills
-                            .map(normalizeSkill)
+                            .map(
+                                normalizeSkill
+                            )
                             .includes(
-                                normalizeSkill(skill)
+                                normalizeSkill(
+                                    skill
+                                )
                             )
                 );
 
@@ -2209,8 +3366,10 @@
                     {
                         missing_skills:
                             missingSkills,
+
                         target_company:
                             state.targetCompany,
+
                         target_role:
                             state.targetRole
                     }
@@ -2261,7 +3420,10 @@
                 roadmapContainer.innerHTML =
                     phases
                         .map(
-                            (phase, index) => `
+                            (
+                                phase,
+                                index
+                            ) => `
                                 <div class="roadmap-phase-card">
                                     <div class="roadmap-phase-title">
                                         ${escapeHtml(
@@ -2299,13 +3461,17 @@
                                         ) &&
                                         phase.skills.length
                                             ? `
-                                                <div class="skills-container"
-                                                     style="margin-bottom:10px;">
+                                                <div
+                                                    class="skills-container"
+                                                    style="margin-bottom:10px;"
+                                                >
                                                     ${phase.skills
                                                         .map(
                                                             (skill) =>
                                                                 `<span class="skill-tag">
-                                                                    ${escapeHtml(skill)}
+                                                                    ${escapeHtml(
+                                                                        skill
+                                                                    )}
                                                                 </span>`
                                                         )
                                                         .join("")}
@@ -2328,7 +3494,9 @@
                                                         .map(
                                                             (item) =>
                                                                 `<li>
-                                                                    ${escapeHtml(item)}
+                                                                    ${escapeHtml(
+                                                                        item
+                                                                    )}
                                                                 </li>`
                                                         )
                                                         .join("")}
@@ -2356,7 +3524,9 @@
                     resources.length
                         ? resources
                             .map(
-                                (resource) => `
+                                (
+                                    resource
+                                ) => `
                                     <details>
                                         <summary>
                                             📚
@@ -2406,7 +3576,9 @@
                                                             </strong>
 
                                                             <a
-                                                                href="${escapeHtml(resource.docs)}"
+                                                                href="${escapeHtml(
+                                                                    resource.docs
+                                                                )}"
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 class="extracted-link"
@@ -2470,7 +3642,8 @@
         }
 
         const metrics =
-            window.LATEST_METRICS || {};
+            window.LATEST_METRICS ||
+            {};
 
         const matchedSkills =
             Array.isArray(
@@ -2559,17 +3732,23 @@
                 html +=
                     prep.technical_known
                         .map(
-                            (item, index) => `
+                            (
+                                item,
+                                index
+                            ) => `
                                 <details style="margin-bottom:12px;">
                                     <summary>
                                         Q${index + 1} —
                                         ${escapeHtml(
-                                            item.skill || ""
+                                            item.skill ||
+                                            ""
                                         )}
 
                                         ${
                                             item.q
-                                                ? `: ${escapeHtml(item.q)}`
+                                                ? `: ${escapeHtml(
+                                                    item.q
+                                                )}`
                                                 : ""
                                         }
                                     </summary>
@@ -2585,7 +3764,9 @@
                                                         <strong>
                                                             Answer:
                                                         </strong>
-                                                        ${escapeHtml(item.a)}
+                                                        ${escapeHtml(
+                                                            item.a
+                                                        )}
                                                     </p>
                                                 `
                                                 : ""
@@ -2600,7 +3781,9 @@
                                                         <strong>
                                                             Tip:
                                                         </strong>
-                                                        ${escapeHtml(item.tip)}
+                                                        ${escapeHtml(
+                                                            item.tip
+                                                        )}
                                                     </p>
                                                 `
                                                 : ""
@@ -2628,13 +3811,19 @@
                 html +=
                     prep.gap_questions
                         .map(
-                            (item, index) => `
+                            (
+                                item,
+                                index
+                            ) => `
                                 <details style="margin-bottom:12px;">
                                     <summary>
                                         Gap Question ${index + 1}
+
                                         ${
                                             item.skill
-                                                ? ` — ${escapeHtml(item.skill)}`
+                                                ? ` — ${escapeHtml(
+                                                    item.skill
+                                                )}`
                                                 : ""
                                         }
                                     </summary>
@@ -2650,7 +3839,9 @@
                                                         <strong>
                                                             Question:
                                                         </strong>
-                                                        ${escapeHtml(item.q)}
+                                                        ${escapeHtml(
+                                                            item.q
+                                                        )}
                                                     </p>
                                                 `
                                                 : ""
@@ -2663,7 +3854,9 @@
                                                         <strong>
                                                             Answer:
                                                         </strong>
-                                                        ${escapeHtml(item.a)}
+                                                        ${escapeHtml(
+                                                            item.a
+                                                        )}
                                                     </p>
                                                 `
                                                 : ""
@@ -2691,7 +3884,10 @@
                 html +=
                     prep.behavioral
                         .map(
-                            (item, index) => `
+                            (
+                                item,
+                                index
+                            ) => `
                                 <details style="margin-bottom:12px;">
                                     <summary>
                                         HR Question ${index + 1}
@@ -2708,7 +3904,9 @@
                                                         <strong>
                                                             Question:
                                                         </strong>
-                                                        ${escapeHtml(item.q)}
+                                                        ${escapeHtml(
+                                                            item.q
+                                                        )}
                                                     </p>
                                                 `
                                                 : ""
@@ -2809,7 +4007,10 @@
                     "click",
                     () => {
                         available.forEach(
-                            ([otherTab, otherPanel]) => {
+                            ([
+                                otherTab,
+                                otherPanel
+                            ]) => {
                                 $(otherTab)
                                     .classList
                                     .remove(
@@ -2825,7 +4026,9 @@
 
                         $(tabId)
                             .classList
-                            .add("active");
+                            .add(
+                                "active"
+                            );
 
                         $(panelId)
                             .style
@@ -2907,6 +4110,7 @@
                         "ask_interview_ai",
                         {
                             prompt,
+
                             target_company:
                                 state.targetCompany,
 
@@ -2978,7 +4182,9 @@
                                 .map(
                                     (step) =>
                                         `<li>
-                                            ${escapeHtml(step)}
+                                            ${escapeHtml(
+                                                step
+                                            )}
                                         </li>`
                                 )
                                 .join("")}
@@ -2986,7 +4192,9 @@
                     `;
                 }
 
-                if (result.sample_question) {
+                if (
+                    result.sample_question
+                ) {
                     html += `
                         <div style="
                             margin-top:18px;
@@ -3052,8 +4260,10 @@
             }
         );
 
-        qsa(".ai-preset-btn")
-            .forEach((button) => {
+        qsa(
+            ".ai-preset-btn"
+        ).forEach(
+            (button) => {
                 button.addEventListener(
                     "click",
                     () => {
@@ -3069,7 +4279,8 @@
                         askAI();
                     }
                 );
-            });
+            }
+        );
     }
 
     /* ============================================================
@@ -3107,9 +4318,11 @@
                     answer.value.trim();
 
                 if (!userAnswer) {
-                    alert(
+                    await showErrorPopup(
+                        "Answer Required",
                         "Please type your answer first."
                     );
+
                     return;
                 }
 
@@ -3119,7 +4332,8 @@
                         : "";
 
                 if (
-                    question === "custom" &&
+                    question ===
+                        "custom" &&
                     customQuestion
                 ) {
                     question =
@@ -3138,6 +4352,7 @@
                             "evaluate_answer",
                             {
                                 question,
+
                                 answer:
                                     userAnswer,
 
@@ -3150,7 +4365,8 @@
                         );
 
                     if (!apiSuccess(result)) {
-                        alert(
+                        await showErrorPopup(
+                            "Evaluation Failed",
                             result.message ||
                             "Answer evaluation failed."
                         );
@@ -3223,7 +4439,9 @@
                                 .map(
                                     (item) =>
                                         `<li>
-                                            ${escapeHtml(item)}
+                                            ${escapeHtml(
+                                                item
+                                            )}
                                         </li>`
                                 )
                                 .join("");
@@ -3244,7 +4462,9 @@
                                 .map(
                                     (item) =>
                                         `<li>
-                                            ${escapeHtml(item)}
+                                            ${escapeHtml(
+                                                item
+                                            )}
                                         </li>`
                                 )
                                 .join("");
@@ -3256,13 +4476,19 @@
                         result.feedback ||
                         ""
                     );
+
+                    await showSuccessPopup(
+                        "Evaluation Complete",
+                        "Your interview answer has been evaluated."
+                    );
                 } catch (error) {
                     console.error(
                         "Evaluation error:",
                         error
                     );
 
-                    alert(
+                    await showErrorPopup(
+                        "Evaluation Error",
                         "Unable to evaluate the answer."
                     );
                 } finally {
@@ -3275,8 +4501,12 @@
         );
     }
 
-    function setText(id, value) {
-        const element = $(id);
+    function setText(
+        id,
+        value
+    ) {
+        const element =
+            $(id);
 
         if (element) {
             element.textContent =
@@ -3303,7 +4533,9 @@
                 event.preventDefault();
 
                 const formData =
-                    new FormData(form);
+                    new FormData(
+                        form
+                    );
 
                 formData.append(
                     "action",
@@ -3320,7 +4552,11 @@
                             formData
                         );
 
-                    if (apiSuccess(result)) {
+                    if (
+                        apiSuccess(
+                            result
+                        )
+                    ) {
                         showMessage(
                             message,
                             result.message ||
@@ -3328,22 +4564,43 @@
                             "success"
                         );
 
-                        if (result.user) {
+                        if (
+                            result.user
+                        ) {
                             state.user =
                                 result.user;
                         }
+
+                        await showSuccessPopup(
+                            "Profile Updated",
+                            result.message ||
+                            "Your profile has been updated successfully."
+                        );
                     } else {
                         showMessage(
                             message,
                             result.message ||
                             "Unable to update profile."
                         );
+
+                        await showErrorPopup(
+                            "Profile Update Failed",
+                            result.message ||
+                            "Unable to update profile."
+                        );
                     }
                 } catch (error) {
-                    console.error(error);
+                    console.error(
+                        error
+                    );
 
                     showMessage(
                         message,
+                        "Unable to update profile."
+                    );
+
+                    await showErrorPopup(
+                        "Profile Update Failed",
                         "Unable to update profile."
                     );
                 }
@@ -3356,11 +4613,10 @@
        ============================================================ */
 
     function initLogout() {
-        const buttons =
-            [
-                $("logout-button"),
-                $("btn-logout")
-            ].filter(Boolean);
+        const buttons = [
+            $("logout-button"),
+            $("btn-logout")
+        ].filter(Boolean);
 
         buttons.forEach(
             (button) => {
@@ -3377,7 +4633,9 @@
                                 "GET"
                             );
                         } catch (error) {
-                            console.error(error);
+                            console.error(
+                                error
+                            );
                         }
 
                         window.location.href =
@@ -3402,12 +4660,7 @@
 
         form.addEventListener(
             "submit",
-            (event) => {
-                /*
-                 * Allow the PHP form to submit normally.
-                 * Only make sure dynamic target data is used.
-                 */
-
+            () => {
                 const company =
                     form.querySelector(
                         "[name='target_company']"
@@ -3463,9 +4716,19 @@
                 state.careerJobs
             );
 
+        if (
+            state.careerJobs.length
+        ) {
+            state.careerJobCount =
+                state.careerJobs.length;
+        }
+
         renderExtractedSkills();
+
         renderATS();
+
         renderJobs();
+
         updateStats();
     }
 
@@ -3483,15 +4746,16 @@
             return;
         }
 
-        /*
-         * Uses a data URI, so the browser does not request
-         * /favicon.ico from the server.
-         */
         const favicon =
-            document.createElement("link");
+            document.createElement(
+                "link"
+            );
 
-        favicon.rel = "icon";
-        favicon.type = "image/svg+xml";
+        favicon.rel =
+            "icon";
+
+        favicon.type =
+            "image/svg+xml";
 
         favicon.href =
             "data:image/svg+xml," +
@@ -3521,7 +4785,10 @@
        SAFE INITIALIZATION
        ============================================================ */
 
-    function safeInit(name, fn) {
+    function safeInit(
+        name,
+        fn
+    ) {
         try {
             fn();
         } catch (error) {
@@ -3537,6 +4804,15 @@
        ============================================================ */
 
     function boot() {
+        /*
+         * Popup must be initialized first
+         * so every later function can use it.
+         */
+        safeInit(
+            "popup system",
+            initPopupSystem
+        );
+
         safeInit(
             "favicon",
             fixFavicon404
@@ -3630,7 +4906,21 @@
         hideCareerElementsWhenLoggedOut();
 
         if (state.loggedIn) {
-            loadMetrics();
+            loadMetrics()
+                .then(() => {
+                    /*
+                     * Make sure local jobs remain
+                     * visible after metrics load.
+                     */
+                    updateStats();
+                })
+                .catch(
+                    (error) =>
+                        console.error(
+                            "Initial metrics error:",
+                            error
+                        )
+                );
         }
 
         hidePageLoader();
