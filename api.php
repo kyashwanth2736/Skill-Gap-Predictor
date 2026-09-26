@@ -11,7 +11,9 @@
  *      ↓
  * Actual jobs / roles / requirements
  *      ↓
- * PHP fallback scraper if Python returns 0 jobs
+ * PHP fallback scraper
+ *      ↓
+ * Source-specific career search fallback
  *      ↓
  * Resume upload
  *      ↓
@@ -21,7 +23,7 @@
  *      ↓
  * Dynamically recommended job role
  *
- * No predefined company or job role is used.
+ * No predefined job role is used.
  */
 
 session_start();
@@ -165,8 +167,7 @@ function callPythonBridge($action, $payload = [])
 
         fclose($pipes[2]);
 
-        $exitCode =
-            proc_close($process);
+        proc_close($process);
 
         $decoded =
             json_decode(
@@ -347,6 +348,7 @@ function normalizeCareerJobs($jobs)
         }
 
         if (is_array($location)) {
+
             $location =
                 implode(
                     ', ',
@@ -379,10 +381,6 @@ function normalizeCareerJobs($jobs)
                 $requiredSkills
             );
 
-        /*
-         * If skills are not separately supplied,
-         * try extracting them from the description.
-         */
         if (
             empty($requiredSkills) &&
             $description !== ''
@@ -394,10 +392,6 @@ function normalizeCareerJobs($jobs)
                 );
         }
 
-        /*
-         * A job must have at least a real title
-         * or actual requirements.
-         */
         if (
             $role === '' &&
             empty($requiredSkills)
@@ -465,13 +459,6 @@ function extractSkillsFromText($text)
         return [];
     }
 
-    /*
-     * These are skill names, not predefined jobs
-     * or companies.
-     *
-     * They are used only to recognize technical
-     * requirements appearing in actual job text.
-     */
     $skillVocabulary = [
 
         'python',
@@ -652,9 +639,6 @@ function findJobsInResponse($data)
         }
     }
 
-    /*
-     * Handle an array that itself contains job objects.
-     */
     $directJobs =
         normalizeCareerJobs($data);
 
@@ -662,9 +646,6 @@ function findJobsInResponse($data)
         return $directJobs;
     }
 
-    /*
-     * Search nested structures.
-     */
     foreach ($data as $value) {
 
         if (!is_array($value)) {
@@ -706,7 +687,7 @@ function storeCareerJobs($jobs, $url = '')
 
 
 /* ============================================================
-   HTTP GET FOR FALLBACK SCRAPER
+   HTTP GET
    ============================================================ */
 
 function httpGetPage($url, $timeout = 15)
@@ -737,10 +718,10 @@ function httpGetPage($url, $timeout = 15)
                 true,
 
             CURLOPT_MAXREDIRS =>
-                5,
+                8,
 
             CURLOPT_CONNECTTIMEOUT =>
-                8,
+                10,
 
             CURLOPT_TIMEOUT =>
                 $timeout,
@@ -750,7 +731,7 @@ function httpGetPage($url, $timeout = 15)
 
             CURLOPT_HTTPHEADER => [
                 'Accept: text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
-                'Accept-Language: en-US,en;q=0.8'
+                'Accept-Language: en-US,en;q=0.9'
             ],
 
             CURLOPT_ENCODING =>
@@ -833,11 +814,11 @@ function makeAbsoluteUrl($baseUrl, $href)
 
     if (
         strpos(
-            $href,
+            strtolower($href),
             'javascript:'
         ) === 0 ||
         strpos(
-            $href,
+            strtolower($href),
             'mailto:'
         ) === 0 ||
         strpos(
@@ -858,11 +839,12 @@ function makeAbsoluteUrl($baseUrl, $href)
     }
 
     $base =
-        parse_url(
-            $baseUrl
-        );
+        parse_url($baseUrl);
 
-    if (!$base || empty($base['host'])) {
+    if (
+        !$base ||
+        empty($base['host'])
+    ) {
         return '';
     }
 
@@ -906,10 +888,6 @@ function makeAbsoluteUrl($baseUrl, $href)
             '/'
         );
 
-    if ($directory === '') {
-        $directory = '';
-    }
-
     return
         $scheme .
         '://' .
@@ -921,193 +899,14 @@ function makeAbsoluteUrl($baseUrl, $href)
 
 
 /* ============================================================
-   FALLBACK CAREER SCRAPER
+   EXTRACT BODY TEXT
    ============================================================ */
 
-function scrapeCareerPageFallback($url)
+function extractHtmlBodyText($html)
 {
-    $page =
-        httpGetPage(
-            $url,
-            20
-        );
-
-    if (
-        !$page['success'] ||
-        $page['body'] === ''
-    ) {
-
-        return [
-            "jobs" => [],
-            "message" =>
-                $page['message']
-                ?? 'Unable to read career page.'
-        ];
+    if ($html === '') {
+        return '';
     }
-
-    $html =
-        $page['body'];
-
-    $jobs = [];
-
-
-    /*
-     * --------------------------------------------------------
-     * 1. JSON-LD JOB POSTING
-     * --------------------------------------------------------
-     */
-
-    if (
-        preg_match_all(
-            '/<script[^>]+type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is',
-            $html,
-            $matches
-        )
-    ) {
-
-        foreach (
-            $matches[1]
-            as $jsonText
-        ) {
-
-            $decoded =
-                json_decode(
-                    html_entity_decode(
-                        $jsonText,
-                        ENT_QUOTES | ENT_HTML5,
-                        'UTF-8'
-                    ),
-                    true
-                );
-
-            if (!is_array($decoded)) {
-                continue;
-            }
-
-            $objects = [];
-
-            if (
-                isset($decoded['@graph']) &&
-                is_array($decoded['@graph'])
-            ) {
-
-                $objects =
-                    $decoded['@graph'];
-
-            } elseif (
-                isset($decoded[0])
-            ) {
-
-                $objects =
-                    $decoded;
-
-            } else {
-
-                $objects[] =
-                    $decoded;
-            }
-
-            foreach ($objects as $obj) {
-
-                if (!is_array($obj)) {
-                    continue;
-                }
-
-                $type =
-                    strtolower(
-                        (string)(
-                            $obj['@type']
-                            ?? ''
-                        )
-                    );
-
-                if (
-                    strpos(
-                        $type,
-                        'jobposting'
-                    ) === false
-                ) {
-                    continue;
-                }
-
-                $description =
-                    cleanText(
-                        $obj['description']
-                        ?? ''
-                    );
-
-                $skills =
-                    normalizeSkills(
-                        $obj['skills']
-                        ?? $obj['qualifications']
-                        ?? []
-                    );
-
-                if (
-                    empty($skills) &&
-                    $description !== ''
-                ) {
-
-                    $skills =
-                        extractSkillsFromText(
-                            $description
-                        );
-                }
-
-                $company = '';
-
-                if (
-                    isset(
-                        $obj['hiringOrganization']
-                    ) &&
-                    is_array(
-                        $obj['hiringOrganization']
-                    )
-                ) {
-
-                    $company =
-                        cleanText(
-                            $obj['hiringOrganization']['name']
-                            ?? ''
-                        );
-                }
-
-                $jobUrl =
-                    $obj['url']
-                    ?? $url;
-
-                $jobs[] = [
-                    "company" =>
-                        $company,
-
-                    "role" =>
-                        cleanText(
-                            $obj['title']
-                            ?? ''
-                        ),
-
-                    "required_skills" =>
-                        $skills,
-
-                    "url" =>
-                        $jobUrl,
-
-                    "description" =>
-                        $description,
-
-                    "location" =>
-                        ''
-                ];
-            }
-        }
-    }
-
-
-    /*
-     * --------------------------------------------------------
-     * 2. HTML JOB LINKS
-     * --------------------------------------------------------
-     */
 
     if (class_exists('DOMDocument')) {
 
@@ -1126,168 +925,540 @@ function scrapeCareerPageFallback($url)
         $xpath =
             new DOMXPath($dom);
 
-        $anchors =
-            $xpath->query('//a[@href]');
+        $nodes =
+            $xpath->query(
+                '//body'
+            );
 
-        if ($anchors !== false) {
+        if (
+            $nodes !== false &&
+            $nodes->length > 0
+        ) {
 
-            foreach ($anchors as $anchor) {
-
-                $href =
-                    $anchor->getAttribute(
-                        'href'
-                    );
-
-                $title =
-                    cleanText(
-                        $anchor->textContent
-                    );
-
-                if (
-                    $title === '' ||
-                    strlen($title) < 4
-                ) {
-                    continue;
-                }
-
-                /*
-                 * Avoid navigation links.
-                 */
-                $lowerTitle =
-                    strtolower($title);
-
-                $blockedWords = [
-                    'login',
-                    'sign in',
-                    'sign up',
-                    'home',
-                    'about us',
-                    'contact us',
-                    'privacy',
-                    'terms',
-                    'cookie',
-                    'search',
-                    'menu',
-                    'learn more'
-                ];
-
-                $blocked = false;
-
-                foreach (
-                    $blockedWords
-                    as $blockedWord
-                ) {
-
-                    if (
-                        $lowerTitle ===
-                        $blockedWord
-                    ) {
-
-                        $blocked = true;
-                        break;
-                    }
-                }
-
-                if ($blocked) {
-                    continue;
-                }
-
-                /*
-                 * Job-related URL patterns.
-                 */
-                $jobLike =
-                    preg_match(
-                        '/job|jobs|career|careers|position|opening|vacanc|requisition|opportunit/i',
-                        $href . ' ' . $title
-                    );
-
-                if (!$jobLike) {
-                    continue;
-                }
-
-                $absolute =
-                    makeAbsoluteUrl(
-                        $url,
-                        $href
-                    );
-
-                if ($absolute === '') {
-                    continue;
-                }
-
-                /*
-                 * Prevent duplicate JSON-LD results.
-                 */
-                $duplicate = false;
-
-                foreach ($jobs as $existing) {
-
-                    if (
-                        strtolower(
-                            trim(
-                                $existing['url']
-                                ?? ''
-                            )
-                        ) ===
-                        strtolower(
-                            trim($absolute)
-                        )
-                    ) {
-
-                        $duplicate = true;
-                        break;
-                    }
-                }
-
-                if ($duplicate) {
-                    continue;
-                }
-
-                $jobs[] = [
-                    "company" =>
-                        '',
-
-                    "role" =>
-                        $title,
-
-                    "required_skills" =>
-                        [],
-
-                    "url" =>
-                        $absolute,
-
-                    "description" =>
-                        '',
-
-                    "location" =>
-                        ''
-                ];
-
-                /*
-                 * Avoid downloading hundreds of pages.
-                 */
-                if (count($jobs) >= 25) {
-                    break;
-                }
-            }
+            return cleanText(
+                $nodes->item(0)->textContent
+            );
         }
     }
 
+    $text =
+        preg_replace(
+            '/<script\b[^>]*>.*?<\/script>/is',
+            ' ',
+            $html
+        );
 
-    /*
-     * --------------------------------------------------------
-     * 3. FETCH INDIVIDUAL JOB PAGES
-     * --------------------------------------------------------
-     *
-     * This is important for career pages where the main
-     * page contains only job links.
-     */
+    $text =
+        preg_replace(
+            '/<style\b[^>]*>.*?<\/style>/is',
+            ' ',
+            $text
+        );
 
+    $text =
+        preg_replace(
+            '/<noscript\b[^>]*>.*?<\/noscript>/is',
+            ' ',
+            $text
+        );
+
+    return cleanText($text);
+}
+
+
+/* ============================================================
+   EXTRACT JSON-LD JOBS
+   ============================================================ */
+
+function extractJsonLdJobs($html, $sourceUrl)
+{
+    $jobs = [];
+
+    if (
+        !preg_match_all(
+            '/<script[^>]+type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is',
+            $html,
+            $matches
+        )
+    ) {
+        return [];
+    }
+
+    foreach (
+        $matches[1]
+        as $jsonText
+    ) {
+
+        $jsonText =
+            html_entity_decode(
+                $jsonText,
+                ENT_QUOTES | ENT_HTML5,
+                'UTF-8'
+            );
+
+        $decoded =
+            json_decode(
+                trim($jsonText),
+                true
+            );
+
+        if (!is_array($decoded)) {
+            continue;
+        }
+
+        $objects = [];
+
+        if (
+            isset($decoded['@graph']) &&
+            is_array($decoded['@graph'])
+        ) {
+
+            $objects =
+                $decoded['@graph'];
+
+        } elseif (
+            isset($decoded[0]) &&
+            is_array($decoded[0])
+        ) {
+
+            $objects =
+                $decoded;
+
+        } else {
+
+            $objects[] =
+                $decoded;
+        }
+
+        foreach ($objects as $obj) {
+
+            if (!is_array($obj)) {
+                continue;
+            }
+
+            $type =
+                strtolower(
+                    (string)(
+                        $obj['@type']
+                        ?? ''
+                    )
+                );
+
+            if (
+                strpos(
+                    $type,
+                    'jobposting'
+                ) === false
+            ) {
+                continue;
+            }
+
+            $description =
+                cleanText(
+                    $obj['description']
+                    ?? ''
+                );
+
+            $skills =
+                normalizeSkills(
+                    $obj['skills']
+                    ?? $obj['qualifications']
+                    ?? []
+                );
+
+            if (
+                empty($skills) &&
+                $description !== ''
+            ) {
+
+                $skills =
+                    extractSkillsFromText(
+                        $description
+                    );
+            }
+
+            $company = '';
+
+            if (
+                isset(
+                    $obj['hiringOrganization']
+                ) &&
+                is_array(
+                    $obj['hiringOrganization']
+                )
+            ) {
+
+                $company =
+                    cleanText(
+                        $obj['hiringOrganization']['name']
+                        ?? ''
+                    );
+            }
+
+            $location = '';
+
+            if (
+                isset(
+                    $obj['jobLocation']
+                ) &&
+                is_array(
+                    $obj['jobLocation']
+                )
+            ) {
+
+                $location =
+                    json_encode(
+                        $obj['jobLocation'],
+                        JSON_UNESCAPED_UNICODE
+                    );
+
+                $location =
+                    cleanText($location);
+            }
+
+            $jobs[] = [
+                "company" =>
+                    $company,
+
+                "role" =>
+                    cleanText(
+                        $obj['title']
+                        ?? ''
+                    ),
+
+                "required_skills" =>
+                    $skills,
+
+                "url" =>
+                    trim(
+                        (string)(
+                            $obj['url']
+                            ?? $sourceUrl
+                        )
+                    ),
+
+                "description" =>
+                    $description,
+
+                "location" =>
+                    $location
+            ];
+        }
+    }
+
+    return normalizeCareerJobs($jobs);
+}
+
+
+/* ============================================================
+   EXTRACT JOB LINKS WITH REGEX
+   ============================================================ */
+
+function extractJobLinksWithRegex(
+    $html,
+    $baseUrl,
+    $limit = 50
+) {
+    $jobs = [];
+
+    if (
+        !preg_match_all(
+            '/<a\b[^>]*href\s*=\s*["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is',
+            $html,
+            $matches,
+            PREG_SET_ORDER
+        )
+    ) {
+        return [];
+    }
+
+    foreach ($matches as $match) {
+
+        $href =
+            $match[1]
+            ?? '';
+
+        $anchorHtml =
+            $match[2]
+            ?? '';
+
+        $title =
+            cleanText(
+                $anchorHtml
+            );
+
+        if (
+            $title === '' ||
+            strlen($title) < 4
+        ) {
+            continue;
+        }
+
+        $absolute =
+            makeAbsoluteUrl(
+                $baseUrl,
+                $href
+            );
+
+        if ($absolute === '') {
+            continue;
+        }
+
+        $lowerUrl =
+            strtolower($absolute);
+
+        $lowerTitle =
+            strtolower($title);
+
+        $isJobLink =
+            preg_match(
+                '/\/jobs?\//i',
+                $lowerUrl
+            ) ||
+            preg_match(
+                '/job|career|position|opening|vacanc|requisition|opportunit/i',
+                $lowerUrl . ' ' . $lowerTitle
+            );
+
+        if (!$isJobLink) {
+            continue;
+        }
+
+        $blockedWords = [
+            'login',
+            'sign in',
+            'sign up',
+            'home',
+            'about us',
+            'contact us',
+            'privacy',
+            'terms',
+            'cookie',
+            'search',
+            'menu',
+            'learn more',
+            'read more',
+            'apply now'
+        ];
+
+        $blocked = false;
+
+        foreach ($blockedWords as $blockedWord) {
+
+            if (
+                $lowerTitle ===
+                $blockedWord
+            ) {
+
+                $blocked = true;
+                break;
+            }
+        }
+
+        if ($blocked) {
+            continue;
+        }
+
+        $jobs[] = [
+            "company" =>
+                '',
+
+            "role" =>
+                $title,
+
+            "required_skills" =>
+                [],
+
+            "url" =>
+                $absolute,
+
+            "description" =>
+                '',
+
+            "location" =>
+                ''
+        ];
+
+        if (
+            count($jobs) >= $limit
+        ) {
+            break;
+        }
+    }
+
+    return normalizeCareerJobs($jobs);
+}
+
+
+/* ============================================================
+   EXTRACT JOB LINKS WITH DOM
+   ============================================================ */
+
+function extractJobLinksWithDom(
+    $html,
+    $baseUrl,
+    $limit = 50
+) {
+    $jobs = [];
+
+    if (!class_exists('DOMDocument')) {
+        return [];
+    }
+
+    $dom =
+        new DOMDocument();
+
+    libxml_use_internal_errors(true);
+
+    @$dom->loadHTML(
+        '<?xml encoding="UTF-8">' .
+        $html
+    );
+
+    libxml_clear_errors();
+
+    $xpath =
+        new DOMXPath($dom);
+
+    $anchors =
+        $xpath->query(
+            '//a[@href]'
+        );
+
+    if (
+        $anchors === false
+    ) {
+        return [];
+    }
+
+    foreach ($anchors as $anchor) {
+
+        $href =
+            $anchor->getAttribute(
+                'href'
+            );
+
+        $title =
+            cleanText(
+                $anchor->textContent
+            );
+
+        if (
+            $title === '' ||
+            strlen($title) < 4
+        ) {
+            continue;
+        }
+
+        $absolute =
+            makeAbsoluteUrl(
+                $baseUrl,
+                $href
+            );
+
+        if ($absolute === '') {
+            continue;
+        }
+
+        $lowerUrl =
+            strtolower($absolute);
+
+        $lowerTitle =
+            strtolower($title);
+
+        $isJobLink =
+            preg_match(
+                '/\/jobs?\//i',
+                $lowerUrl
+            ) ||
+            preg_match(
+                '/job|career|position|opening|vacanc|requisition|opportunit/i',
+                $lowerUrl . ' ' . $lowerTitle
+            );
+
+        if (!$isJobLink) {
+            continue;
+        }
+
+        $blockedWords = [
+            'login',
+            'sign in',
+            'sign up',
+            'home',
+            'about us',
+            'contact us',
+            'privacy',
+            'terms',
+            'cookie',
+            'search',
+            'menu',
+            'learn more',
+            'read more',
+            'apply now'
+        ];
+
+        $blocked = false;
+
+        foreach ($blockedWords as $blockedWord) {
+
+            if (
+                $lowerTitle ===
+                $blockedWord
+            ) {
+
+                $blocked = true;
+                break;
+            }
+        }
+
+        if ($blocked) {
+            continue;
+        }
+
+        $jobs[] = [
+            "company" =>
+                '',
+
+            "role" =>
+                $title,
+
+            "required_skills" =>
+                [],
+
+            "url" =>
+                $absolute,
+
+            "description" =>
+                '',
+
+            "location" =>
+                ''
+        ];
+
+        if (
+            count($jobs) >= $limit
+        ) {
+            break;
+        }
+    }
+
+    return normalizeCareerJobs($jobs);
+}
+
+
+/* ============================================================
+   ENRICH JOB DETAILS
+   ============================================================ */
+
+function enrichJobDetails(
+    $jobs,
+    $limit = 20
+) {
     $processed = 0;
 
     foreach ($jobs as $index => $job) {
 
-        if ($processed >= 15) {
+        if ($processed >= $limit) {
             break;
         }
 
@@ -1296,15 +1467,28 @@ function scrapeCareerPageFallback($url)
             ?? '';
 
         if (
-            $jobUrl === '' ||
-            $job['description'] !== ''
+            $jobUrl === ''
         ) {
             continue;
         }
 
-        /*
-         * Only fetch HTTP/HTTPS links.
-         */
+        $existingDescription =
+            $job['description']
+            ?? '';
+
+        $existingSkills =
+            normalizeSkills(
+                $job['required_skills']
+                ?? []
+            );
+
+        if (
+            $existingDescription !== '' &&
+            !empty($existingSkills)
+        ) {
+            continue;
+        }
+
         if (
             !preg_match(
                 '#^https?://#i',
@@ -1332,92 +1516,233 @@ function scrapeCareerPageFallback($url)
         $detailHtml =
             $detail['body'];
 
-        $detailText = '';
-
-        if (class_exists('DOMDocument')) {
-
-            $detailDom =
-                new DOMDocument();
-
-            libxml_use_internal_errors(true);
-
-            @$detailDom->loadHTML(
-                '<?xml encoding="UTF-8">' .
-                $detailHtml
+        /*
+         * First try JSON-LD because job detail pages
+         * often contain structured JobPosting data.
+         */
+        $jsonJobs =
+            extractJsonLdJobs(
+                $detailHtml,
+                $jobUrl
             );
 
-            libxml_clear_errors();
+        if (
+            !empty($jsonJobs)
+        ) {
 
-            $detailXpath =
-                new DOMXPath(
-                    $detailDom
-                );
-
-            $nodes =
-                $detailXpath->query(
-                    '//body'
-                );
+            $first =
+                $jsonJobs[0];
 
             if (
-                $nodes !== false &&
-                $nodes->length > 0
+                empty($jobs[$index]['role']) &&
+                !empty($first['role'])
             ) {
+                $jobs[$index]['role'] =
+                    $first['role'];
+            }
 
-                $detailText =
-                    cleanText(
-                        $nodes->item(0)->textContent
-                    );
+            if (
+                empty($jobs[$index]['company']) &&
+                !empty($first['company'])
+            ) {
+                $jobs[$index]['company'] =
+                    $first['company'];
+            }
+
+            if (
+                empty($jobs[$index]['location']) &&
+                !empty($first['location'])
+            ) {
+                $jobs[$index]['location'] =
+                    $first['location'];
+            }
+
+            if (
+                empty($jobs[$index]['description']) &&
+                !empty($first['description'])
+            ) {
+                $jobs[$index]['description'] =
+                    $first['description'];
+            }
+
+            if (
+                empty(
+                    $jobs[$index]['required_skills']
+                ) &&
+                !empty(
+                    $first['required_skills']
+                )
+            ) {
+                $jobs[$index]['required_skills'] =
+                    $first['required_skills'];
             }
         }
 
-        if ($detailText === '') {
+        /*
+         * If structured data did not provide the
+         * description, extract visible page text.
+         */
+        if (
+            empty(
+                $jobs[$index]['description']
+            )
+        ) {
 
             $detailText =
-                cleanText(
-                    preg_replace(
-                        '/<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>/is',
-                        ' ',
-                        $detailHtml
-                    )
+                extractHtmlBodyText(
+                    $detailHtml
                 );
-        }
 
-        if ($detailText !== '') {
-
-            /*
-             * Limit description size so the session
-             * does not become unnecessarily large.
-             */
             if (
-                strlen($detailText) > 12000
+                $detailText !== ''
             ) {
 
-                $detailText =
-                    substr(
-                        $detailText,
-                        0,
-                        12000
-                    );
-            }
+                if (
+                    strlen($detailText) > 12000
+                ) {
 
-            $jobs[$index]['description'] =
-                $detailText;
+                    $detailText =
+                        substr(
+                            $detailText,
+                            0,
+                            12000
+                        );
+                }
+
+                $jobs[$index]['description'] =
+                    $detailText;
+            }
+        }
+
+        if (
+            empty(
+                $jobs[$index]['required_skills']
+            )
+        ) {
 
             $jobs[$index]['required_skills'] =
                 extractSkillsFromText(
-                    $detailText
+                    $jobs[$index]['description']
+                    ?? ''
                 );
         }
     }
 
+    return normalizeCareerJobs($jobs);
+}
+
+
+/* ============================================================
+   GENERIC FALLBACK CAREER SCRAPER
+   ============================================================ */
+
+function scrapeCareerPageFallback($url)
+{
+    $page =
+        httpGetPage(
+            $url,
+            25
+        );
+
+    if (
+        !$page['success'] ||
+        $page['body'] === ''
+    ) {
+
+        return [
+            "jobs" => [],
+            "message" =>
+                $page['message']
+                ?? 'Unable to read career page.'
+        ];
+    }
+
+    $html =
+        $page['body'];
+
+    $jobs = [];
+
 
     /*
-     * Normalize final results.
+     * JSON-LD jobs.
      */
+    $jsonJobs =
+        extractJsonLdJobs(
+            $html,
+            $url
+        );
+
+    if (!empty($jsonJobs)) {
+
+        $jobs =
+            array_merge(
+                $jobs,
+                $jsonJobs
+            );
+    }
+
+
+    /*
+     * DOM links.
+     */
+    $domJobs =
+        extractJobLinksWithDom(
+            $html,
+            $url,
+            50
+        );
+
+    if (!empty($domJobs)) {
+
+        $jobs =
+            array_merge(
+                $jobs,
+                $domJobs
+            );
+    }
+
+
+    /*
+     * Regex links.
+     *
+     * This also works when the PHP DOM extension
+     * is not installed on the server.
+     */
+    $regexJobs =
+        extractJobLinksWithRegex(
+            $html,
+            $url,
+            50
+        );
+
+    if (!empty($regexJobs)) {
+
+        $jobs =
+            array_merge(
+                $jobs,
+                $regexJobs
+            );
+    }
+
+
     $jobs =
         normalizeCareerJobs(
             $jobs
         );
+
+
+    /*
+     * Enrich individual job pages.
+     */
+    if (!empty($jobs)) {
+
+        $jobs =
+            enrichJobDetails(
+                $jobs,
+                20
+            );
+    }
+
 
     return [
         "jobs" =>
@@ -1426,6 +1751,350 @@ function scrapeCareerPageFallback($url)
         "message" =>
             count($jobs) .
             " job(s) found by fallback scraper."
+    ];
+}
+
+
+/* ============================================================
+   AMAZON CAREER URL → SEARCH URL
+   ============================================================ */
+
+function buildAmazonSearchUrl($url)
+{
+    $parts =
+        parse_url($url);
+
+    if (
+        !$parts ||
+        empty($parts['host'])
+    ) {
+        return '';
+    }
+
+    $host =
+        strtolower(
+            $parts['host']
+        );
+
+    if (
+        strpos(
+            $host,
+            'amazon.jobs'
+        ) === false
+    ) {
+        return '';
+    }
+
+    $path =
+        $parts['path']
+        ?? '';
+
+    /*
+     * Amazon location pages have paths similar to:
+     *
+     * /content/en/locations/india/bangalore
+     *
+     * The final location segment can be used by the
+     * Amazon job search system.
+     */
+    $segments =
+        array_values(
+            array_filter(
+                explode(
+                    '/',
+                    trim(
+                        $path,
+                        '/'
+                    )
+                )
+            )
+        );
+
+    if (empty($segments)) {
+        return '';
+    }
+
+    $locationSlug =
+        '';
+
+    for (
+        $i = count($segments) - 1;
+        $i >= 0;
+        $i--
+    ) {
+
+        $candidate =
+            strtolower(
+                trim(
+                    $segments[$i]
+                )
+            );
+
+        if (
+            $candidate === '' ||
+            $candidate === 'locations' ||
+            $candidate === 'location' ||
+            $candidate === 'india' ||
+            $candidate === 'en' ||
+            $candidate === 'content'
+        ) {
+            continue;
+        }
+
+        $locationSlug =
+            $candidate;
+
+        break;
+    }
+
+    if ($locationSlug === '') {
+        return '';
+    }
+
+    return
+        'https://www.amazon.jobs/en/search?loc_query=' .
+        rawurlencode(
+            str_replace(
+                '-',
+                ' ',
+                $locationSlug
+            )
+        );
+}
+
+
+/* ============================================================
+   AMAZON SEARCH PAGE SCRAPER
+   ============================================================ */
+
+function scrapeAmazonSearchPage($searchUrl)
+{
+    $page =
+        httpGetPage(
+            $searchUrl,
+            30
+        );
+
+    if (
+        !$page['success'] ||
+        $page['body'] === ''
+    ) {
+
+        return [
+            "jobs" => [],
+            "message" =>
+                $page['message']
+                ?? 'Unable to read Amazon job search page.'
+        ];
+    }
+
+    $html =
+        $page['body'];
+
+    $jobs = [];
+
+
+    /*
+     * JSON-LD first.
+     */
+    $jsonJobs =
+        extractJsonLdJobs(
+            $html,
+            $searchUrl
+        );
+
+    if (!empty($jsonJobs)) {
+
+        $jobs =
+            array_merge(
+                $jobs,
+                $jsonJobs
+            );
+    }
+
+
+    /*
+     * DOM extraction.
+     */
+    $domJobs =
+        extractJobLinksWithDom(
+            $html,
+            $searchUrl,
+            50
+        );
+
+    if (!empty($domJobs)) {
+
+        $jobs =
+            array_merge(
+                $jobs,
+                $domJobs
+            );
+    }
+
+
+    /*
+     * Regex extraction.
+     */
+    $regexJobs =
+        extractJobLinksWithRegex(
+            $html,
+            $searchUrl,
+            50
+        );
+
+    if (!empty($regexJobs)) {
+
+        $jobs =
+            array_merge(
+                $jobs,
+                $regexJobs
+            );
+    }
+
+
+    /*
+     * Amazon job links can be present as escaped JSON
+     * strings inside page data. Search those as well.
+     */
+    if (
+        preg_match_all(
+            '#https?://(?:www\.)?amazon\.jobs/[^"\']*/jobs/[^"\']+#i',
+            $html,
+            $amazonUrlMatches
+        )
+    ) {
+
+        foreach (
+            $amazonUrlMatches[0]
+            as $amazonUrl
+        ) {
+
+            $amazonUrl =
+                html_entity_decode(
+                    $amazonUrl,
+                    ENT_QUOTES | ENT_HTML5,
+                    'UTF-8'
+                );
+
+            $jobs[] = [
+                "company" =>
+                    '',
+
+                "role" =>
+                    '',
+
+                "required_skills" =>
+                    [],
+
+                "url" =>
+                    $amazonUrl,
+
+                "description" =>
+                    '',
+
+                "location" =>
+                    ''
+            ];
+        }
+    }
+
+
+    /*
+     * Remove duplicates.
+     */
+    $jobs =
+        normalizeCareerJobs(
+            $jobs
+        );
+
+
+    /*
+     * Enrich actual job pages.
+     */
+    if (!empty($jobs)) {
+
+        $jobs =
+            enrichJobDetails(
+                $jobs,
+                20
+            );
+    }
+
+
+    return [
+        "jobs" =>
+            $jobs,
+
+        "message" =>
+            count($jobs) .
+            " job(s) found from the career search page.",
+
+        "search_url" =>
+            $searchUrl
+    ];
+}
+
+
+/* ============================================================
+   SOURCE-SPECIFIC CAREER SCRAPER
+   ============================================================ */
+
+function scrapeSourceSpecificCareerPage($url)
+{
+    $parts =
+        parse_url($url);
+
+    if (
+        !$parts ||
+        empty($parts['host'])
+    ) {
+
+        return [
+            "jobs" => [],
+            "message" => ''
+        ];
+    }
+
+    $host =
+        strtolower(
+            $parts['host']
+        );
+
+
+    /*
+     * Amazon location/content pages.
+     *
+     * This does NOT define a job or company target.
+     * It simply translates an Amazon location page
+     * into the site's job-search page so that actual
+     * current listings can be collected.
+     */
+    if (
+        strpos(
+            $host,
+            'amazon.jobs'
+        ) !== false
+    ) {
+
+        $searchUrl =
+            buildAmazonSearchUrl(
+                $url
+            );
+
+        if ($searchUrl !== '') {
+
+            return
+                scrapeAmazonSearchPage(
+                    $searchUrl
+                );
+        }
+    }
+
+
+    return [
+        "jobs" => [],
+        "message" => ''
     ];
 }
 
@@ -1488,9 +2157,6 @@ function skillMatches(
         return true;
     }
 
-    /*
-     * Common equivalent forms.
-     */
     $aliases = [
         'node.js' =>
             ['node'],
@@ -1579,10 +2245,6 @@ function calculateLocalJobRecommendation(
                 ?? []
             );
 
-        /*
-         * If a job does not contain structured
-         * skills, try using its description.
-         */
         if (
             empty($required) &&
             !empty(
@@ -1825,9 +2487,6 @@ if ($action === 'login') {
         $_SESSION['user'] =
             $authRes['user'];
 
-        /*
-         * Start with an empty dynamic analysis.
-         */
         $_SESSION['extracted_skills'] = [];
 
         $_SESSION['ats_score'] = null;
@@ -1848,17 +2507,27 @@ if ($action === 'login') {
 
         jsonResponse([
             "status" => "success",
+
             "message" =>
                 "Login successful.",
+
             "user" =>
                 $authRes['user'],
+
             "loggedIn" =>
-                true
+                true,
+
+            "redirect" =>
+                "dashboard"
         ]);
     }
 
     jsonResponse([
         "status" => "error",
+
+        "error_code" =>
+            "INVALID_CREDENTIALS",
+
         "message" =>
             $authRes['message']
             ?? "Invalid email or password."
@@ -1922,8 +2591,10 @@ if ($action === 'signup') {
 
         jsonResponse([
             "status" => "error",
+
             "error_code" =>
                 "VALIDATION_ERROR",
+
             "message" =>
                 "Please fill in all required account fields."
         ], 400);
@@ -1939,8 +2610,10 @@ if ($action === 'signup') {
 
         jsonResponse([
             "status" => "error",
+
             "error_code" =>
                 "INVALID_EMAIL",
+
             "message" =>
                 "Please enter a valid email address."
         ], 400);
@@ -1953,8 +2626,10 @@ if ($action === 'signup') {
 
         jsonResponse([
             "status" => "error",
+
             "error_code" =>
                 "WEAK_PASSWORD",
+
             "message" =>
                 "Password must contain at least 6 characters."
         ], 400);
@@ -1962,7 +2637,9 @@ if ($action === 'signup') {
 
 
     /*
-     * Company and role are intentionally empty.
+     * Company and role remain empty during registration.
+     * They are populated only from actual career-page
+     * analysis and recommendation.
      */
     $regRes =
         registerUser(
@@ -1986,22 +2663,31 @@ if ($action === 'signup') {
 
         jsonResponse([
             "status" => "success",
+
             "message" =>
                 "Account registered successfully.",
+
             "registered" =>
-                true
+                true,
+
+            "accountCreated" =>
+                true,
+
+            "redirect" =>
+                "login"
         ]);
     }
 
 
     /*
-     * Make duplicate account detection easy
-     * for the frontend.
+     * Duplicate account detection.
      */
     $registrationMessage =
         strtolower(
-            $regRes['message']
-            ?? ''
+            trim(
+                $regRes['message']
+                ?? ''
+            )
         );
 
     $duplicate =
@@ -2009,30 +2695,65 @@ if ($action === 'signup') {
             $registrationMessage,
             'already'
         ) !== false ||
+
         strpos(
             $registrationMessage,
             'exist'
         ) !== false ||
+
         strpos(
             $registrationMessage,
             'duplicate'
         ) !== false ||
-        strpos(
-            $registrationMessage,
-            'email'
-        ) !== false &&
-        strpos(
-            $registrationMessage,
-            'taken'
-        ) !== false;
+
+        (
+            strpos(
+                $registrationMessage,
+                'email'
+            ) !== false &&
+
+            (
+                strpos(
+                    $registrationMessage,
+                    'taken'
+                ) !== false ||
+
+                strpos(
+                    $registrationMessage,
+                    'registered'
+                ) !== false
+            )
+        );
+
+
+    if ($duplicate) {
+
+        jsonResponse([
+            "status" => "error",
+
+            "error_code" =>
+                "ACCOUNT_EXISTS",
+
+            "accountExists" =>
+                true,
+
+            "message" =>
+                "An account with this email already exists. Please log in instead.",
+
+            "redirect" =>
+                "login"
+        ], 409);
+    }
+
 
     jsonResponse([
         "status" => "error",
 
         "error_code" =>
-            $duplicate
-                ? "ACCOUNT_EXISTS"
-                : "REGISTRATION_FAILED",
+            "REGISTRATION_FAILED",
+
+        "accountExists" =>
+            false,
 
         "message" =>
             $regRes['message']
@@ -2073,8 +2794,10 @@ if ($action === 'logout') {
 
     jsonResponse([
         "status" => "success",
+
         "message" =>
             "Logged out successfully.",
+
         "loggedIn" =>
             false
     ]);
@@ -2093,8 +2816,10 @@ if (
 
     jsonResponse([
         "status" => "error",
+
         "message" =>
             "Unauthorized access. Please log in.",
+
         "loggedIn" =>
             false
     ], 401);
@@ -2157,6 +2882,7 @@ if ($action === 'update_profile') {
                 $_POST['target_company']
             )
             : '';
+
 
     $role =
         array_key_exists(
@@ -2237,8 +2963,10 @@ if ($action === 'update_profile') {
 
         jsonResponse([
             "status" => "success",
+
             "message" =>
                 "Profile updated successfully.",
+
             "user" =>
                 $_SESSION['user']
         ]);
@@ -2247,6 +2975,7 @@ if ($action === 'update_profile') {
 
     jsonResponse([
         "status" => "error",
+
         "message" =>
             "Failed to update profile."
     ], 500);
@@ -2268,10 +2997,6 @@ if ($action === 'update_skills') {
         $skills;
 
 
-    /*
-     * Recalculate recommendation if career
-     * jobs already exist.
-     */
     $recommendation = null;
 
     if (
@@ -2299,8 +3024,10 @@ if ($action === 'update_skills') {
 
     jsonResponse([
         "status" => "success",
+
         "skills" =>
             $skills,
+
         "recommendation" =>
             $recommendation
     ]);
@@ -2323,6 +3050,7 @@ if ($action === 'upload_resume') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "Please select a valid resume file."
         ], 400);
@@ -2356,6 +3084,7 @@ if ($action === 'upload_resume') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "Unsupported file type. Please upload PDF, DOCX or TXT."
         ], 400);
@@ -2363,8 +3092,7 @@ if ($action === 'upload_resume') {
 
 
     /*
-     * Prefer /var/data on Render when available.
-     * Fall back to the system temporary directory.
+     * Prefer persistent Render storage.
      */
     $baseUploadDir =
         '';
@@ -2411,6 +3139,7 @@ if ($action === 'upload_resume') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "Resume storage directory is not writable."
         ], 500);
@@ -2446,6 +3175,7 @@ if ($action === 'upload_resume') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "Unable to store the uploaded resume."
         ], 500);
@@ -2482,6 +3212,7 @@ if ($action === 'upload_resume') {
                 ? $parseRes
                 : [
                     "status" => "error",
+
                     "message" =>
                         "Resume parsing failed."
                 ],
@@ -2514,10 +3245,6 @@ if ($action === 'upload_resume') {
             : null;
 
 
-    /*
-     * Resume contact information comes only
-     * from the uploaded resume.
-     */
     $contact =
         $_SESSION['parsed_resume']['contact_info']
         ?? [];
@@ -2551,10 +3278,6 @@ if ($action === 'upload_resume') {
     }
 
 
-    /*
-     * If career jobs already exist, immediately
-     * calculate the dynamic recommendation.
-     */
     $recommendation = null;
 
     if (
@@ -2582,10 +3305,6 @@ if ($action === 'upload_resume') {
     }
 
 
-    /*
-     * Otherwise preserve any manually selected
-     * dynamic requirements.
-     */
     $requiredSkills =
         normalizeSkills(
             $_POST['required_skills']
@@ -2632,10 +3351,6 @@ if ($action === 'upload_resume') {
     }
 
 
-    /*
-     * Use recommendation requirements when
-     * available.
-     */
     if (
         $recommendation !== null
     ) {
@@ -2659,10 +3374,6 @@ if ($action === 'upload_resume') {
     }
 
 
-    /*
-     * Calculate metrics only when real
-     * requirements exist.
-     */
     $metrics = [];
 
 
@@ -2704,10 +3415,6 @@ if ($action === 'upload_resume') {
     }
 
 
-    /*
-     * Save evaluation only when actual job
-     * requirements are available.
-     */
     if (
         !empty($requiredSkills)
     ) {
@@ -2774,11 +3481,6 @@ if ($action === 'upload_resume') {
 
 if ($action === 'load_sample') {
 
-    /*
-     * Kept for compatibility.
-     *
-     * It does not create a company or role.
-     */
     $sampleRes =
         callPythonBridge(
             "parse_sample",
@@ -2814,21 +3516,19 @@ if ($action === 'load_sample') {
             $sampleRes['parsed_resume']
             ?? [];
 
+
         $_SESSION['extracted_skills'] =
             normalizeSkills(
                 $sampleRes['extracted_skills']
                 ?? []
             );
 
+
         $_SESSION['ats_score'] =
             $sampleRes['ats_score']
             ?? null;
 
 
-        /*
-         * Dynamic recommendation if jobs
-         * are already available.
-         */
         $recommendation = null;
 
         if (
@@ -2860,8 +3560,10 @@ if ($action === 'load_sample') {
 
         jsonResponse([
             "status" => "success",
+
             "data" =>
                 $sampleRes,
+
             "recommended_job" =>
                 $recommendation
         ]);
@@ -2890,6 +3592,7 @@ if ($action === 'scrape_url') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "Please enter a career URL."
         ], 400);
@@ -2905,6 +3608,7 @@ if ($action === 'scrape_url') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "Please enter a valid career URL."
         ], 400);
@@ -2933,10 +3637,33 @@ if ($action === 'scrape_url') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "Only HTTP and HTTPS career URLs are supported."
         ], 400);
     }
+
+
+    /*
+     * Always reset the previous career source.
+     */
+    $_SESSION['career_jobs'] =
+        [];
+
+    $_SESSION['career_url'] =
+        $url;
+
+    $_SESSION['recommended_job'] =
+        null;
+
+    $_SESSION['target_company'] =
+        '';
+
+    $_SESSION['target_role'] =
+        '';
+
+    $_SESSION['required_skills'] =
+        [];
 
 
     /*
@@ -2945,7 +3672,7 @@ if ($action === 'scrape_url') {
      * --------------------------------------------------------
      */
 
-    $res =
+    $pythonRes =
         callPythonBridge(
             "scrape_url",
             [
@@ -2959,32 +3686,24 @@ if ($action === 'scrape_url') {
 
 
     if (
-        is_array($res)
+        is_array($pythonRes)
     ) {
 
         $jobs =
             findJobsInResponse(
-                $res
+                $pythonRes
             );
     }
 
 
     /*
      * --------------------------------------------------------
-     * SECOND: PHP FALLBACK
+     * SECOND: GENERIC PHP FALLBACK
      * --------------------------------------------------------
-     *
-     * Important:
-     *
-     * Some career websites return a successful HTTP response
-     * but the Python scraper may find zero jobs.
-     *
-     * In that case we DO NOT immediately report:
-     *
-     *     0 job(s) found
-     *
-     * Instead PHP tries the actual career page.
      */
+
+    $scraperMessages = [];
+
 
     if (
         empty($jobs)
@@ -3004,6 +3723,57 @@ if ($action === 'scrape_url') {
             $jobs =
                 $fallback['jobs'];
         }
+
+        if (
+            !empty(
+                $fallback['message']
+            )
+        ) {
+
+            $scraperMessages[] =
+                $fallback['message'];
+        }
+    }
+
+
+    /*
+     * --------------------------------------------------------
+     * THIRD: SOURCE-SPECIFIC FALLBACK
+     * --------------------------------------------------------
+     *
+     * This is especially important for career sites
+     * where a location page is separate from the actual
+     * job-search/listing page.
+     */
+
+    if (
+        empty($jobs)
+    ) {
+
+        $sourceFallback =
+            scrapeSourceSpecificCareerPage(
+                $url
+            );
+
+        if (
+            !empty(
+                $sourceFallback['jobs']
+            )
+        ) {
+
+            $jobs =
+                $sourceFallback['jobs'];
+        }
+
+        if (
+            !empty(
+                $sourceFallback['message']
+            )
+        ) {
+
+            $scraperMessages[] =
+                $sourceFallback['message'];
+        }
     }
 
 
@@ -3017,7 +3787,7 @@ if ($action === 'scrape_url') {
 
 
     /*
-     * Store the actual dynamically found jobs.
+     * Store actual dynamically discovered jobs.
      */
     storeCareerJobs(
         $jobs,
@@ -3063,10 +3833,11 @@ if ($action === 'scrape_url') {
 
 
     /*
-     * If no jobs were found, return a useful
-     * diagnostic response instead of pretending
-     * a job was found.
+     * --------------------------------------------------------
+     * ZERO RESULTS
+     * --------------------------------------------------------
      */
+
     if (
         empty(
             $_SESSION['career_jobs']
@@ -3074,18 +3845,20 @@ if ($action === 'scrape_url') {
     ) {
 
         $pythonMessage =
-            is_array($res)
+            is_array($pythonRes)
                 ? (
-                    $res['message']
+                    $pythonRes['message']
                     ?? ''
                 )
                 : '';
 
+
         jsonResponse([
-            "status" => "success",
+            "status" =>
+                "success",
 
             "message" =>
-                "0 job(s) found. The career page could not be parsed into individual job listings.",
+                "No individual job listings could be extracted from this career URL.",
 
             "career_url" =>
                 $_SESSION['career_url'],
@@ -3100,13 +3873,20 @@ if ($action === 'scrape_url') {
                 null,
 
             "scraper_message" =>
-                $pythonMessage
+                $pythonMessage,
+
+            "diagnostics" =>
+                $scraperMessages
         ]);
     }
 
 
+    /*
+     * Successful result.
+     */
     jsonResponse([
-        "status" => "success",
+        "status" =>
+            "success",
 
         "message" =>
             count(
@@ -3153,6 +3933,7 @@ if ($action === 'recommend_job') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "No jobs have been loaded. Enter a career URL first."
         ], 400);
@@ -3165,6 +3946,7 @@ if ($action === 'recommend_job') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "Please upload your resume before calculating the best matching role."
         ], 400);
@@ -3184,6 +3966,7 @@ if ($action === 'recommend_job') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "The available jobs do not contain enough skill information for matching."
         ], 400);
@@ -3197,6 +3980,7 @@ if ($action === 'recommend_job') {
 
     jsonResponse([
         "status" => "success",
+
         "recommendation" =>
             $recommendation
     ]);
@@ -3245,6 +4029,7 @@ if ($action === 'get_metrics') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "No job role has been selected."
         ], 400);
@@ -3257,6 +4042,7 @@ if ($action === 'get_metrics') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "No job requirements are available. Please enter a career URL and select a job."
         ], 400);
@@ -3355,15 +4141,13 @@ if ($action === 'rank_jobs') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "No career jobs available. Please enter a career URL first."
         ], 400);
     }
 
 
-    /*
-     * Python ranking first.
-     */
     $res =
         callPythonBridge(
             "rank_jobs",
@@ -3381,10 +4165,6 @@ if ($action === 'rank_jobs') {
         );
 
 
-    /*
-     * Use Python result only when it actually
-     * returned ranked jobs.
-     */
     $pythonJobs =
         findJobsInResponse(
             $res
@@ -3397,15 +4177,13 @@ if ($action === 'rank_jobs') {
 
         jsonResponse([
             "status" => "success",
+
             "jobs" =>
                 $pythonJobs
         ]);
     }
 
 
-    /*
-     * Local dynamic ranking fallback.
-     */
     $ranked = [];
 
 
@@ -3457,6 +4235,7 @@ if ($action === 'rank_jobs') {
 
     jsonResponse([
         "status" => "success",
+
         "jobs" =>
             $ranked
     ]);
@@ -3502,6 +4281,7 @@ if ($action === 'get_roadmap') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "No target job role has been selected."
         ], 400);
@@ -3566,6 +4346,7 @@ if ($action === 'get_interview') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "No target job role has been selected."
         ], 400);
@@ -3632,6 +4413,7 @@ if ($action === 'ask_interview_ai') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "No target job role has been selected."
         ], 400);
@@ -3696,6 +4478,7 @@ if ($action === 'evaluate_answer') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "No target job role has been selected."
         ], 400);
@@ -3766,6 +4549,7 @@ if ($action === 'download_pdf') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "No target job role is available."
         ], 400);
@@ -3778,6 +4562,7 @@ if ($action === 'download_pdf') {
 
         jsonResponse([
             "status" => "error",
+
             "message" =>
                 "No job requirements are available for the report."
         ], 400);
@@ -3941,6 +4726,7 @@ if ($action === 'download_pdf') {
 
             jsonResponse([
                 "status" => "error",
+
                 "message" =>
                     "Generated PDF data is invalid."
             ], 500);
@@ -3987,6 +4773,7 @@ if ($action === 'download_pdf') {
 
     jsonResponse([
         "status" => "error",
+
         "message" =>
             "PDF generation failed."
     ], 500);
@@ -3999,6 +4786,7 @@ if ($action === 'download_pdf') {
 
 jsonResponse([
     "status" => "error",
+
     "message" =>
         "Invalid API action: " .
         $action
