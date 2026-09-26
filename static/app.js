@@ -503,6 +503,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 data instanceof FormData
             ) {
 
+                /*
+                 * Do NOT manually set Content-Type here.
+                 * Browser must generate the multipart boundary.
+                 */
+
                 fetchOptions.body =
                     data;
 
@@ -586,12 +591,6 @@ document.addEventListener("DOMContentLoaded", function () {
        ======================================================== */
 
     function redirectToDashboard() {
-
-        /*
-         * The PHP session is created by api.php.
-         * Reloading index.php makes PHP read that session
-         * and render the authenticated dashboard.
-         */
 
         try {
 
@@ -947,10 +946,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
 
 
-                    /*
-                     * Update local state immediately.
-                     */
-
                     state.loggedIn =
                         true;
 
@@ -959,23 +954,12 @@ document.addEventListener("DOMContentLoaded", function () {
                         null;
 
 
-                    /*
-                     * Show success message briefly.
-                     */
-
                     showMessage(
                         successBox,
                         "Login successful. Redirecting to dashboard...",
                         "success"
                     );
 
-
-                    /*
-                     * Important:
-                     * The PHP session exists on the server now.
-                     * Reload the page so index.php renders the
-                     * authenticated dashboard instead of the auth screen.
-                     */
 
                     window.setTimeout(
                         function () {
@@ -1399,10 +1383,6 @@ document.addEventListener("DOMContentLoaded", function () {
             "dark",
             dark
         );
-
-        /*
-         * Your styles.css uses dark-mode.
-         */
 
         body.classList.toggle(
             "dark-mode",
@@ -2751,6 +2731,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     /* ========================================================
        RESUME UPLOAD
+       UPDATED
        ======================================================== */
 
     function initResumeUpload() {
@@ -2773,11 +2754,28 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
 
+        /*
+         * Make the browser file picker show the
+         * supported resume formats.
+         */
+
+        input.setAttribute(
+            "accept",
+            ".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+        );
+
+
+        /* ----------------------------------------------------
+           SELECT BUTTON
+           ---------------------------------------------------- */
+
         if (selectButton) {
 
             selectButton.addEventListener(
                 "click",
-                function () {
+                function (event) {
+
+                    event.preventDefault();
 
                     input.click();
                 }
@@ -2785,26 +2783,61 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
 
+        /* ----------------------------------------------------
+           NORMAL FILE SELECTION
+           ---------------------------------------------------- */
+
         input.addEventListener(
             "change",
             function () {
 
-                if (
+                const file =
                     input.files &&
                     input.files.length
-                ) {
+                        ? input.files[0]
+                        : null;
+
+
+                if (!file) {
 
                     state.selectedResume =
-                        input.files[0];
+                        null;
+
+                    updateResumeFileName("");
+
+                    return;
+                }
 
 
-                    updateResumeFileName(
-                        input.files[0].name
+                const valid =
+                    setSelectedResume(
+                        file
                     );
+
+
+                if (!valid) {
+
+                    /*
+                     * Clear the input when an invalid
+                     * file is selected.
+                     */
+
+                    try {
+                        input.value = "";
+                    } catch (error) {
+                        console.warn(
+                            "Unable to clear file input:",
+                            error
+                        );
+                    }
                 }
             }
         );
 
+
+        /* ----------------------------------------------------
+           DRAG AND DROP
+           ---------------------------------------------------- */
 
         if (dropZone) {
 
@@ -2819,6 +2852,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         function (event) {
 
                             event.preventDefault();
+                            event.stopPropagation();
 
                             dropZone.classList.add(
                                 "dragover"
@@ -2840,6 +2874,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         function (event) {
 
                             event.preventDefault();
+                            event.stopPropagation();
 
                             dropZone.classList.remove(
                                 "dragover"
@@ -2855,39 +2890,74 @@ document.addEventListener("DOMContentLoaded", function () {
                 function (event) {
 
                     const files =
+                        event.dataTransfer &&
                         event.dataTransfer.files;
 
 
                     if (
-                        files &&
-                        files.length
+                        !files ||
+                        !files.length
                     ) {
-
-                        try {
-
-                            input.files =
-                                files;
-
-                        } catch (error) {
-                            /*
-                             * Some browsers do not allow
-                             * assigning files directly.
-                             */
-                        }
+                        return;
+                    }
 
 
-                        state.selectedResume =
-                            files[0];
+                    const file =
+                        files[0];
 
 
-                        updateResumeFileName(
-                            files[0].name
+                    const valid =
+                        setSelectedResume(
+                            file
+                        );
+
+
+                    if (!valid) {
+                        return;
+                    }
+
+
+                    /*
+                     * Synchronize the hidden/native
+                     * input with the dropped file.
+                     */
+
+                    try {
+
+                        const dataTransfer =
+                            new DataTransfer();
+
+                        dataTransfer.items.add(
+                            file
+                        );
+
+                        input.files =
+                            dataTransfer.files;
+
+                    } catch (error) {
+
+                        /*
+                         * Some browsers do not allow
+                         * assigning FileList.
+                         *
+                         * This is okay because the
+                         * actual File object remains
+                         * stored in state.selectedResume.
+                         */
+
+                        console.warn(
+                            "Could not synchronize dropped file with input:",
+                            error
                         );
                     }
                 }
             );
         }
 
+
+        /* ----------------------------------------------------
+           FORM SUBMISSION
+           ---------------------------------------------------- */
 
         if (form) {
 
@@ -2904,6 +2974,173 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
+    /* --------------------------------------------------------
+       RESUME VALIDATION
+       -------------------------------------------------------- */
+
+    function setSelectedResume(
+        file
+    ) {
+
+        if (!file) {
+
+            state.selectedResume =
+                null;
+
+            updateResumeFileName("");
+
+            return false;
+        }
+
+
+        const fileName =
+            String(
+                file.name || ""
+            ).trim();
+
+
+        const lowerName =
+            fileName.toLowerCase();
+
+
+        const allowedExtensions = [
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".txt"
+        ];
+
+
+        const validExtension =
+            allowedExtensions.some(
+                function (extension) {
+
+                    return lowerName.endsWith(
+                        extension
+                    );
+                }
+            );
+
+
+        if (!validExtension) {
+
+            state.selectedResume =
+                null;
+
+            updateResumeFileName("");
+
+
+            showPopup(
+                "Invalid Resume File",
+                "Please select a PDF, DOC, DOCX or TXT resume file.",
+                "warning"
+            );
+
+
+            return false;
+        }
+
+
+        /*
+         * Reject empty files.
+         */
+
+        if (
+            !Number(file.size) ||
+            Number(file.size) <= 0
+        ) {
+
+            state.selectedResume =
+                null;
+
+            updateResumeFileName("");
+
+
+            showPopup(
+                "Invalid Resume File",
+                "The selected resume file is empty. Please choose another file.",
+                "warning"
+            );
+
+
+            return false;
+        }
+
+
+        /*
+         * 10 MB maximum.
+         */
+
+        const maxSize =
+            10 * 1024 * 1024;
+
+
+        if (
+            Number(file.size) >
+            maxSize
+        ) {
+
+            state.selectedResume =
+                null;
+
+            updateResumeFileName("");
+
+
+            showPopup(
+                "Resume File Too Large",
+                "Please select a resume smaller than 10 MB.",
+                "warning"
+            );
+
+
+            return false;
+        }
+
+
+        /*
+         * Store the actual File object.
+         */
+
+        state.selectedResume =
+            file;
+
+
+        updateResumeFileName(
+            fileName
+        );
+
+
+        /*
+         * Optional visual feedback for
+         * the drop zone.
+         */
+
+        const dropZone =
+            $("resume-drop-zone");
+
+
+        if (dropZone) {
+
+            dropZone.classList.add(
+                "file-selected"
+            );
+        }
+
+
+        console.log(
+            "Resume selected:",
+            {
+                name: file.name,
+                type: file.type,
+                size: file.size
+            }
+        );
+
+
+        return true;
+    }
+
+
     function updateResumeFileName(
         name
     ) {
@@ -2917,8 +3154,32 @@ document.addEventListener("DOMContentLoaded", function () {
             element.textContent =
                 name || "";
         }
+
+
+        /*
+         * Also update common file-name
+         * display elements if present.
+         */
+
+        const displays =
+            qsa(
+                "[data-resume-file-name]"
+            );
+
+
+        displays.forEach(
+            function (display) {
+
+                display.textContent =
+                    name || "";
+            }
+        );
     }
 
+
+    /* --------------------------------------------------------
+       RESUME ANALYSIS
+       -------------------------------------------------------- */
 
     async function uploadResume() {
 
@@ -2926,17 +3187,57 @@ document.addEventListener("DOMContentLoaded", function () {
             $("resume-file");
 
 
+        /*
+         * Prefer the File object stored in state.
+         * This is important for drag-and-drop.
+         */
+
+        let file =
+            state.selectedResume;
+
+
+        /*
+         * If state does not contain a file,
+         * try the native file input.
+         */
+
         if (
-            !input ||
-            !input.files ||
-            !input.files.length
+            !file &&
+            input &&
+            input.files &&
+            input.files.length
         ) {
+
+            file =
+                input.files[0];
+        }
+
+
+        /*
+         * Final validation.
+         */
+
+        if (!file) {
 
             showPopup(
                 "Resume Required",
-                "Please select a PDF or DOCX resume first.",
+                "Please select a valid resume file first.",
                 "warning"
             );
+
+            return;
+        }
+
+
+        /*
+         * Validate again before sending.
+         */
+
+        if (
+            !setSelectedResume(
+                file
+            )
+        ) {
 
             return;
         }
@@ -2946,15 +3247,30 @@ document.addEventListener("DOMContentLoaded", function () {
             $("evaluate-resume");
 
 
+        /*
+         * Create multipart/form-data.
+         */
+
         const formData =
             new FormData();
 
 
+        /*
+         * IMPORTANT:
+         * The PHP backend expects the uploaded file
+         * under the "resume" field.
+         */
+
         formData.append(
             "resume",
-            input.files[0]
+            file,
+            file.name
         );
 
+
+        /*
+         * Send the career URL if one exists.
+         */
 
         if (state.careerUrl) {
 
@@ -2963,6 +3279,28 @@ document.addEventListener("DOMContentLoaded", function () {
                 state.careerUrl
             );
         }
+
+
+        /*
+         * Send the filename explicitly as well.
+         * This does not replace the actual file.
+         */
+
+        formData.append(
+            "resume_name",
+            file.name
+        );
+
+
+        console.log(
+            "Uploading resume:",
+            {
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                careerUrl: state.careerUrl
+            }
+        );
 
 
         setLoading(
@@ -2981,6 +3319,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
 
 
+            console.log(
+                "Resume analysis response:",
+                result
+            );
+
+
             if (
                 !apiSuccess(result)
             ) {
@@ -2988,19 +3332,29 @@ document.addEventListener("DOMContentLoaded", function () {
                 throw new Error(
                     result.message ||
                     result.error ||
+                    result.details ||
                     "Resume analysis failed."
                 );
             }
 
+
+            /*
+             * Extract skills.
+             */
 
             state.extractedSkills =
                 normalizeSkills(
                     result.extracted_skills ||
                     result.skills ||
                     result.data?.extracted_skills ||
+                    result.data?.skills ||
                     []
                 );
 
+
+            /*
+             * Required skills.
+             */
 
             state.requiredSkills =
                 normalizeSkills(
@@ -3010,21 +3364,41 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
 
 
+            /*
+             * ATS score.
+             */
+
             state.atsScore =
                 Number(
-                    result.ats_score ||
-                    result.data?.ats_score ||
+                    result.ats_score ??
+                    result.data?.ats_score ??
                     0
                 );
 
 
-            if (result.resume) {
+            /*
+             * Resume contact details.
+             */
+
+            const resumeData =
+                result.resume ||
+                result.parsed_resume ||
+                result.data?.resume ||
+                result.data?.parsed_resume ||
+                null;
+
+
+            if (resumeData) {
 
                 updateResumeContact(
-                    result.resume
+                    resumeData
                 );
             }
 
+
+            /*
+             * Update the entire dashboard.
+             */
 
             renderATS();
 
@@ -3050,12 +3424,30 @@ document.addEventListener("DOMContentLoaded", function () {
 
         } catch (error) {
 
+            console.error(
+                "Resume analysis error:",
+                error
+            );
+
+
+            /*
+             * Display the actual API error instead
+             * of hiding it behind a generic message.
+             */
+
+            const message =
+                error &&
+                error.message
+                    ? error.message
+                    : "Unable to analyze the resume.";
+
+
             showPopup(
                 "Resume Analysis Failed",
-                error.message ||
-                "Unable to analyze the resume.",
+                message,
                 "error"
             );
+
 
         } finally {
 
@@ -3763,11 +4155,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
 
-            /*
-             * Correct API action:
-             * api.php uses get_roadmap
-             */
-
             const result =
                 await apiRequest(
                     "get_roadmap",
@@ -4113,11 +4500,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
 
-            /*
-             * Correct API action:
-             * api.php uses get_interview
-             */
-
             const result =
                 await apiRequest(
                     "get_interview",
@@ -4250,11 +4632,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         try {
-
-            /*
-             * Correct API action:
-             * api.php uses evaluate_answer
-             */
 
             const result =
                 await apiRequest(
@@ -4389,11 +4766,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         try {
-
-            /*
-             * Correct API action:
-             * api.php uses ask_interview_ai
-             */
 
             const result =
                 await apiRequest(
@@ -4881,10 +5253,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function initializeApplication() {
 
-        /*
-         * Authentication visibility is handled first.
-         */
-
         initializeAuthVisibility();
 
 
@@ -4943,11 +5311,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (state.loggedIn) {
 
             loadMetrics();
-
-            /*
-             * Always start authenticated users
-             * on Dashboard after login/reload.
-             */
 
             navigateToView(
                 "dashboard"
