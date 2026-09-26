@@ -26,7 +26,35 @@
  * No predefined job role is used.
  */
 
-session_start();
+
+/* ============================================================
+   SESSION CONFIGURATION
+   ============================================================ */
+
+$isHttps =
+    (
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        ||
+        (
+            isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
+            &&
+            strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https'
+        )
+    );
+
+if (session_status() === PHP_SESSION_NONE) {
+
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => '',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+
+    session_start();
+}
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -2368,20 +2396,7 @@ if ($action === '') {
 
 /* ============================================================
    PUBLIC ACTIONS
-   ============================================================
- *
- * IMPORTANT:
- *
- * login
- * signup
- * register
- * logout
- *
- * are handled BEFORE the authentication-required block.
- *
- * Therefore a new user can create an account without
- * already being logged in.
- */
+   ============================================================ */
 
 
 /* ============================================================
@@ -2405,10 +2420,8 @@ if ($action === 'login') {
 
         jsonResponse([
             "status" => "error",
-
             "error_code" =>
                 "VALIDATION_ERROR",
-
             "message" =>
                 "Email and password are required."
         ], 400);
@@ -2425,11 +2438,37 @@ if ($action === 'login') {
         $authRes['success']
     ) {
 
+        /*
+         * Regenerate the session ID after authentication.
+         */
         session_regenerate_id(true);
 
-        $_SESSION['user'] =
+        /*
+         * Store authenticated user.
+         */
+        $loggedInUser =
             $authRes['user'];
 
+        $_SESSION['user'] =
+            $loggedInUser;
+
+        /*
+         * Store user ID separately.
+         */
+        $_SESSION['user_id'] =
+            isset($loggedInUser['id'])
+                ? (int)$loggedInUser['id']
+                : 0;
+
+        /*
+         * Explicit authentication flag.
+         */
+        $_SESSION['logged_in'] =
+            true;
+
+        /*
+         * Reset application state.
+         */
         $_SESSION['extracted_skills'] =
             [];
 
@@ -2457,15 +2496,29 @@ if ($action === 'login') {
         $_SESSION['recommended_job'] =
             null;
 
+        /*
+         * Make absolutely sure the PHP session is
+         * written before the response is sent.
+         */
+        session_write_close();
+
         jsonResponse([
             "status" =>
                 "success",
+
+            "success" =>
+                true,
 
             "message" =>
                 "Login successful.",
 
             "user" =>
-                $authRes['user'],
+                $loggedInUser,
+
+            "user_id" =>
+                isset($loggedInUser['id'])
+                    ? (int)$loggedInUser['id']
+                    : 0,
 
             "loggedIn" =>
                 true,
@@ -2491,16 +2544,7 @@ if ($action === 'login') {
 
 /* ============================================================
    SIGNUP / REGISTER
-   ============================================================
- *
- * Both action names are accepted:
- *
- * api.php?action=signup
- * api.php?action=register
- *
- * This prevents frontend naming mismatch from causing the
- * protected authentication block to run.
- */
+   ============================================================ */
 
 if (
     $action === 'signup' ||
@@ -2549,10 +2593,6 @@ if (
         );
 
 
-    /* --------------------------------------------------------
-       REQUIRED FIELDS
-       -------------------------------------------------------- */
-
     if (
         $name === '' ||
         $email === '' ||
@@ -2571,10 +2611,6 @@ if (
         ], 400);
     }
 
-
-    /* --------------------------------------------------------
-       EMAIL VALIDATION
-       -------------------------------------------------------- */
 
     if (
         !filter_var(
@@ -2596,10 +2632,6 @@ if (
     }
 
 
-    /* --------------------------------------------------------
-       PASSWORD VALIDATION
-       -------------------------------------------------------- */
-
     if (
         strlen($password) < 6
     ) {
@@ -2617,13 +2649,6 @@ if (
     }
 
 
-    /*
-     * Company and role intentionally remain empty.
-     *
-     * They will be populated only after the user provides
-     * a career URL and actual jobs are discovered.
-     */
-
     $regRes =
         registerUser(
             $name,
@@ -2638,10 +2663,6 @@ if (
             $github
         );
 
-
-    /* --------------------------------------------------------
-       ACCOUNT CREATED
-       -------------------------------------------------------- */
 
     if (
         isset($regRes['success']) &&
@@ -2675,10 +2696,6 @@ if (
         ], 200);
     }
 
-
-    /* --------------------------------------------------------
-       DUPLICATE ACCOUNT DETECTION
-       -------------------------------------------------------- */
 
     $registrationMessage =
         strtolower(
@@ -2741,10 +2758,6 @@ if (
         ], 409);
     }
 
-
-    /* --------------------------------------------------------
-       OTHER REGISTRATION ERROR
-       -------------------------------------------------------- */
 
     jsonResponse([
         "status" =>
@@ -2811,20 +2824,13 @@ if ($action === 'logout') {
 
 /* ============================================================
    AUTHENTICATION REQUIRED
-   ============================================================
- *
- * Everything below this point requires an authenticated user.
- *
- * signup/register/login/logout have already been handled above.
- */
+   ============================================================ */
 
 if (
-    !isset(
-        $_SESSION['user']
-    ) ||
-    !is_array(
-        $_SESSION['user']
-    )
+    empty($_SESSION['logged_in']) ||
+    empty($_SESSION['user_id']) ||
+    !isset($_SESSION['user']) ||
+    !is_array($_SESSION['user'])
 ) {
 
     jsonResponse([
