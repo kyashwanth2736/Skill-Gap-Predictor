@@ -503,11 +503,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 data instanceof FormData
             ) {
 
-                /*
-                 * Do NOT manually set Content-Type here.
-                 * Browser must generate the multipart boundary.
-                 */
-
                 fetchOptions.body =
                     data;
 
@@ -2731,7 +2726,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     /* ========================================================
        RESUME UPLOAD
-       UPDATED
        ======================================================== */
 
     function initResumeUpload() {
@@ -2753,11 +2747,6 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-
-        /*
-         * Make the browser file picker show the
-         * supported resume formats.
-         */
 
         input.setAttribute(
             "accept",
@@ -2817,14 +2806,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 if (!valid) {
 
-                    /*
-                     * Clear the input when an invalid
-                     * file is selected.
-                     */
-
                     try {
-                        input.value = "";
+
+                        input.value =
+                            "";
+
                     } catch (error) {
+
                         console.warn(
                             "Unable to clear file input:",
                             error
@@ -2917,11 +2905,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
 
 
-                    /*
-                     * Synchronize the hidden/native
-                     * input with the dropped file.
-                     */
-
                     try {
 
                         const dataTransfer =
@@ -2935,15 +2918,6 @@ document.addEventListener("DOMContentLoaded", function () {
                             dataTransfer.files;
 
                     } catch (error) {
-
-                        /*
-                         * Some browsers do not allow
-                         * assigning FileList.
-                         *
-                         * This is okay because the
-                         * actual File object remains
-                         * stored in state.selectedResume.
-                         */
 
                         console.warn(
                             "Could not synchronize dropped file with input:",
@@ -2974,9 +2948,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    /* --------------------------------------------------------
+    /* ========================================================
        RESUME VALIDATION
-       -------------------------------------------------------- */
+       ======================================================== */
 
     function setSelectedResume(
         file
@@ -3041,10 +3015,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
 
-        /*
-         * Reject empty files.
-         */
-
         if (
             !Number(file.size) ||
             Number(file.size) <= 0
@@ -3066,10 +3036,6 @@ document.addEventListener("DOMContentLoaded", function () {
             return false;
         }
 
-
-        /*
-         * 10 MB maximum.
-         */
 
         const maxSize =
             10 * 1024 * 1024;
@@ -3097,10 +3063,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
 
-        /*
-         * Store the actual File object.
-         */
-
         state.selectedResume =
             file;
 
@@ -3109,11 +3071,6 @@ document.addEventListener("DOMContentLoaded", function () {
             fileName
         );
 
-
-        /*
-         * Optional visual feedback for
-         * the drop zone.
-         */
 
         const dropZone =
             $("resume-drop-zone");
@@ -3156,11 +3113,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
 
-        /*
-         * Also update common file-name
-         * display elements if present.
-         */
-
         const displays =
             qsa(
                 "[data-resume-file-name]"
@@ -3177,9 +3129,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    /* --------------------------------------------------------
+    /* ========================================================
        RESUME ANALYSIS
-       -------------------------------------------------------- */
+       ======================================================== */
 
     async function uploadResume() {
 
@@ -3189,7 +3141,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         /*
          * Prefer the File object stored in state.
-         * This is important for drag-and-drop.
+         * This also supports drag-and-drop.
          */
 
         let file =
@@ -3198,7 +3150,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         /*
          * If state does not contain a file,
-         * try the native file input.
+         * read it directly from the input.
          */
 
         if (
@@ -3230,7 +3182,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         /*
-         * Validate again before sending.
+         * Validate the actual File object again.
          */
 
         if (
@@ -3238,6 +3190,26 @@ document.addEventListener("DOMContentLoaded", function () {
                 file
             )
         ) {
+
+            return;
+        }
+
+
+        /*
+         * Make sure the file can actually be read.
+         */
+
+        if (
+            !file.name ||
+            !file.size ||
+            Number(file.size) <= 0
+        ) {
+
+            showPopup(
+                "Invalid Resume File",
+                "The selected resume file could not be read. Please select it again.",
+                "error"
+            );
 
             return;
         }
@@ -3256,9 +3228,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         /*
-         * IMPORTANT:
-         * The PHP backend expects the uploaded file
-         * under the "resume" field.
+         * Send the file using the primary backend field.
          */
 
         formData.append(
@@ -3269,7 +3239,29 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         /*
-         * Send the career URL if one exists.
+         * Also send it using resume_file for compatibility
+         * with backend versions that expect that field.
+         */
+
+        formData.append(
+            "resume_file",
+            file,
+            file.name
+        );
+
+
+        /*
+         * Send filename explicitly.
+         */
+
+        formData.append(
+            "resume_name",
+            file.name
+        );
+
+
+        /*
+         * Send career URL when available.
          */
 
         if (state.careerUrl) {
@@ -3279,17 +3271,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 state.careerUrl
             );
         }
-
-
-        /*
-         * Send the filename explicitly as well.
-         * This does not replace the actual file.
-         */
-
-        formData.append(
-            "resume_name",
-            file.name
-        );
 
 
         console.log(
@@ -3339,7 +3320,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
             /*
-             * Extract skills.
+             * Extracted skills.
              */
 
             state.extractedSkills =
@@ -3360,7 +3341,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 normalizeSkills(
                     result.required_skills ||
                     result.data?.required_skills ||
-                    state.requiredSkills
+                    state.requiredSkills ||
+                    []
                 );
 
 
@@ -3377,7 +3359,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
             /*
-             * Resume contact details.
+             * Parsed resume/contact information.
              */
 
             const resumeData =
@@ -3397,7 +3379,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
             /*
-             * Update the entire dashboard.
+             * Refresh complete application.
              */
 
             renderATS();
@@ -3429,11 +3411,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 error
             );
 
-
-            /*
-             * Display the actual API error instead
-             * of hiding it behind a generic message.
-             */
 
             const message =
                 error &&
@@ -5255,7 +5232,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         initializeAuthVisibility();
 
-
         initAuthTabs();
 
         initLogin();
@@ -5286,9 +5262,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         initReport();
 
-
         initializeTarget();
-
 
         renderATS();
 
@@ -5301,7 +5275,6 @@ document.addEventListener("DOMContentLoaded", function () {
         updateRecommendation();
 
         updateStats();
-
 
         initCharts();
 
