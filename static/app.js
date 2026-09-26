@@ -2,27 +2,39 @@
     "use strict";
 
     /* ============================================================
-       SKILL GAP PREDICTOR - MAIN FRONTEND SCRIPT
+       SKILL GAP PREDICTOR
+       MAIN FRONTEND JAVASCRIPT
        ============================================================ */
 
     const APP = window.APP_DATA || {};
 
     const state = {
-        loggedIn: !!APP.loggedIn,
+        loggedIn: Boolean(APP.loggedIn),
         user: APP.user || null,
-        careerJobs: Array.isArray(APP.careerJobs) ? APP.careerJobs : [],
+
+        careerUrl: APP.careerUrl || "",
+
+        careerJobs: Array.isArray(APP.careerJobs)
+            ? APP.careerJobs
+            : [],
+
         extractedSkills: Array.isArray(APP.extractedSkills)
             ? APP.extractedSkills
             : [],
+
         requiredSkills: Array.isArray(APP.requiredSkills)
             ? APP.requiredSkills
             : [],
+
         atsScore: Number(APP.atsScore || 0),
-        recommendedJob: APP.recommendedJob || null,
+
         targetCompany: APP.targetCompany || "",
+
         targetRole: APP.targetRole || "",
-        currentView: "dashboard"
+
+        recommendedJob: APP.recommendedJob || null
     };
+
 
     /* ============================================================
        BASIC HELPERS
@@ -32,20 +44,24 @@
         return document.getElementById(id);
     }
 
-    function qs(selector, parent) {
-        return (parent || document).querySelector(selector);
+    function qs(selector, parent = document) {
+        return parent.querySelector(selector);
     }
 
-    function qsa(selector, parent) {
-        return Array.from((parent || document).querySelectorAll(selector));
+    function qsa(selector, parent = document) {
+        return Array.from(parent.querySelectorAll(selector));
     }
 
-    function safeText(value) {
-        return value == null ? "" : String(value);
+    function text(value) {
+        if (value === null || value === undefined) {
+            return "";
+        }
+
+        return String(value);
     }
 
     function escapeHtml(value) {
-        return safeText(value)
+        return text(value)
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
@@ -53,113 +69,200 @@
             .replace(/'/g, "&#039;");
     }
 
+
+    /* ============================================================
+       SKILL NORMALIZATION
+       ============================================================ */
+
     function normalizeSkill(skill) {
-        return safeText(skill)
+
+        if (skill === null || skill === undefined) {
+            return "";
+        }
+
+        return String(skill)
             .toLowerCase()
             .replace(/[^a-z0-9+#.\- ]/g, " ")
             .replace(/\s+/g, " ")
             .trim();
     }
 
+
     function normalizeSkills(skills) {
-        if (!Array.isArray(skills)) return [];
 
-        const result = [];
+        if (!Array.isArray(skills)) {
+            return [];
+        }
 
-        skills.forEach(skill => {
-            const value = typeof skill === "string"
-                ? skill
-                : skill?.name || skill?.skill || skill?.title || "";
+        const output = [];
 
-            const cleaned = value.trim();
+        skills.forEach(item => {
 
-            if (
-                cleaned &&
-                !result.some(x => normalizeSkill(x) === normalizeSkill(cleaned))
-            ) {
-                result.push(cleaned);
+            let value = "";
+
+            if (typeof item === "string") {
+                value = item;
+            } else if (item && typeof item === "object") {
+                value =
+                    item.name ||
+                    item.skill ||
+                    item.title ||
+                    item.value ||
+                    "";
+            }
+
+            value = String(value).trim();
+
+            if (!value) {
+                return;
+            }
+
+            const normalized = normalizeSkill(value);
+
+            const exists = output.some(
+                existing =>
+                    normalizeSkill(existing) === normalized
+            );
+
+            if (!exists) {
+                output.push(value);
             }
         });
 
-        return result;
+        return output;
     }
+
+
+    /* ============================================================
+       MESSAGES
+       ============================================================ */
 
     function showMessage(element, message, type = "info") {
-        if (!element) return;
 
-        element.textContent = message;
-        element.className = "form-message " + type;
+        if (!element) {
+            return;
+        }
 
-        element.style.display = message ? "block" : "none";
+        element.textContent = message || "";
+
+        element.className =
+            "form-message " + type;
+
+        element.style.display =
+            message ? "block" : "none";
     }
 
-    function setButtonLoading(button, loading, normalText) {
-        if (!button) return;
+
+    /* ============================================================
+       BUTTON LOADING
+       ============================================================ */
+
+    function setButtonLoading(
+        button,
+        loading,
+        normalText
+    ) {
+
+        if (!button) {
+            return;
+        }
 
         if (loading) {
-            button.dataset.originalText =
-                button.textContent || normalText || "Submit";
+
+            if (!button.dataset.originalText) {
+                button.dataset.originalText =
+                    button.textContent;
+            }
 
             button.disabled = true;
             button.textContent = "Loading...";
+
         } else {
+
             button.disabled = false;
+
             button.textContent =
-                button.dataset.originalText || normalText || "Submit";
+                button.dataset.originalText ||
+                normalText ||
+                "Submit";
+
+            delete button.dataset.originalText;
         }
     }
+
 
     /* ============================================================
        LOADING SCREEN
        ============================================================ */
 
     function hideLoadingScreen() {
+
         const selectors = [
-            "#app-loading",
             "#loading-screen",
+            "#app-loading",
             "#loading-overlay",
-            ".app-loading",
             ".loading-screen",
             ".loading-overlay",
+            ".app-loading",
             ".preloader"
         ];
 
         selectors.forEach(selector => {
+
             qsa(selector).forEach(element => {
+
                 element.style.opacity = "0";
+                element.style.visibility = "hidden";
                 element.style.pointerEvents = "none";
 
                 setTimeout(() => {
                     element.style.display = "none";
-                }, 250);
+                }, 200);
+
             });
+
         });
 
-        /* Also handle a loading element containing the exact text */
+
+        /*
+         * Extra protection for the exact loading text.
+         */
+
         qsa("body *").forEach(element => {
+
             if (
                 element.children.length === 0 &&
                 element.textContent &&
-                element.textContent.trim() === "Loading Skill Gap Predictor"
+                element.textContent.trim() ===
+                "Loading Skill-Gap Predictor ..."
             ) {
+
                 let parent = element;
 
-                for (let i = 0; i < 3 && parent.parentElement; i++) {
+                for (
+                    let i = 0;
+                    i < 4 &&
+                    parent.parentElement;
+                    i++
+                ) {
+
                     parent = parent.parentElement;
 
-                    const style = window.getComputedStyle(parent);
+                    const style =
+                        window.getComputedStyle(
+                            parent
+                        );
 
                     if (
                         style.position === "fixed" ||
                         style.position === "absolute" ||
-                        parent.id.toLowerCase().includes("load")
+                        (parent.id &&
+                         parent.id.toLowerCase().includes("load"))
                     ) {
-                        parent.style.opacity = "0";
-                        parent.style.pointerEvents = "none";
 
-                        setTimeout(() => {
-                            parent.style.display = "none";
-                        }, 250);
+                        parent.style.display = "none";
+                        parent.style.visibility = "hidden";
+                        parent.style.pointerEvents = "none";
 
                         break;
                     }
@@ -168,72 +271,145 @@
         });
     }
 
-    window.addEventListener("load", hideLoadingScreen);
 
-    window.addEventListener("error", () => {
-        hideLoadingScreen();
-    });
+    /*
+     * Do not allow a broken JavaScript function to keep
+     * the application stuck on the loading screen.
+     */
 
-    window.addEventListener("unhandledrejection", () => {
-        hideLoadingScreen();
-    });
+    window.addEventListener(
+        "load",
+        hideLoadingScreen
+    );
+
+    window.addEventListener(
+        "error",
+        () => {
+            hideLoadingScreen();
+        }
+    );
+
+    window.addEventListener(
+        "unhandledrejection",
+        () => {
+            hideLoadingScreen();
+        }
+    );
+
 
     /* ============================================================
        API REQUEST
        ============================================================ */
 
-    async function apiRequest(action, data = {}, timeout = 60000) {
-        const controller = new AbortController();
+    async function apiRequest(
+        action,
+        data = {},
+        timeout = 60000
+    ) {
 
-        const timer = setTimeout(() => {
-            controller.abort();
-        }, timeout);
+        const controller =
+            new AbortController();
+
+        const timeoutId =
+            setTimeout(
+                () => controller.abort(),
+                timeout
+            );
 
         try {
-            const formData = new FormData();
 
-            formData.append("action", action);
+            const formData =
+                new FormData();
+
+            formData.append(
+                "action",
+                action
+            );
+
 
             Object.keys(data).forEach(key => {
+
                 const value = data[key];
 
-                if (value === undefined || value === null) {
-                    formData.append(key, "");
-                } else if (value instanceof File) {
-                    formData.append(key, value);
-                } else if (Array.isArray(value) || typeof value === "object") {
-                    formData.append(key, JSON.stringify(value));
+                if (
+                    value === null ||
+                    value === undefined
+                ) {
+
+                    formData.append(
+                        key,
+                        ""
+                    );
+
+                } else if (
+                    value instanceof File
+                ) {
+
+                    formData.append(
+                        key,
+                        value
+                    );
+
+                } else if (
+                    Array.isArray(value) ||
+                    typeof value === "object"
+                ) {
+
+                    formData.append(
+                        key,
+                        JSON.stringify(value)
+                    );
+
                 } else {
-                    formData.append(key, String(value));
+
+                    formData.append(
+                        key,
+                        String(value)
+                    );
                 }
             });
 
-            const response = await fetch(
-                "api.php?action=" + encodeURIComponent(action),
-                {
-                    method: "POST",
-                    body: formData,
-                    credentials: "same-origin",
-                    cache: "no-store",
-                    signal: controller.signal
-                }
-            );
 
-            const raw = await response.text();
+            const response =
+                await fetch(
+                    "api.php?action=" +
+                    encodeURIComponent(action),
+                    {
+                        method: "POST",
+                        body: formData,
+                        credentials: "same-origin",
+                        cache: "no-store",
+                        signal: controller.signal
+                    }
+                );
+
+
+            const raw =
+                await response.text();
+
 
             let result;
 
             try {
-                result = JSON.parse(raw);
+
+                result =
+                    JSON.parse(raw);
+
             } catch (error) {
-                console.error("API returned non-JSON:", raw);
+
+                console.error(
+                    "Invalid API response:",
+                    raw
+                );
 
                 throw new Error(
-                    "Server returned an invalid response. Please check api.php."
+                    "Server returned an invalid response. Check api.php."
                 );
             }
 
+
             if (!response.ok) {
+
                 throw new Error(
                     result.message ||
                     result.error ||
@@ -241,7 +417,9 @@
                 );
             }
 
+
             if (result.success === false) {
+
                 throw new Error(
                     result.message ||
                     result.error ||
@@ -249,10 +427,16 @@
                 );
             }
 
+
             return result;
 
         } catch (error) {
-            if (error.name === "AbortError") {
+
+            if (
+                error.name ===
+                "AbortError"
+            ) {
+
                 throw new Error(
                     "Request timed out. Please try again."
                 );
@@ -261,405 +445,676 @@
             throw error;
 
         } finally {
-            clearTimeout(timer);
+
+            clearTimeout(
+                timeoutId
+            );
         }
     }
+
 
     /* ============================================================
        AUTH TABS
        ============================================================ */
 
     function initAuthTabs() {
-        const loginTab = $(
-            "login-tab"
-        ) || qs(
-            '[data-auth-tab="login"]'
-        );
 
-        const signupTab = $(
-            "signup-tab"
-        ) || qs(
-            '[data-auth-tab="signup"]'
-        );
+        const loginTab =
+            $("login-tab") ||
+            qs(
+                '[data-auth-tab="login"]'
+            );
+
+        const signupTab =
+            $("signup-tab") ||
+            qs(
+                '[data-auth-tab="signup"]'
+            );
 
         const loginPanel =
             $("login-panel") ||
             $("login-form-panel") ||
-            qs('[data-auth-panel="login"]');
+            qs(
+                '[data-auth-panel="login"]'
+            );
 
         const signupPanel =
             $("signup-panel") ||
             $("signup-form-panel") ||
-            qs('[data-auth-panel="signup"]');
+            qs(
+                '[data-auth-panel="signup"]'
+            );
 
-        if (!loginTab || !signupTab) return;
 
         function showLogin() {
-            loginTab.classList.add("active");
-            signupTab.classList.remove("active");
 
-            if (loginPanel) loginPanel.style.display = "";
-            if (signupPanel) signupPanel.style.display = "none";
+            if (loginTab) {
+                loginTab.classList.add(
+                    "active"
+                );
+            }
+
+            if (signupTab) {
+                signupTab.classList.remove(
+                    "active"
+                );
+            }
+
+            if (loginPanel) {
+                loginPanel.style.display = "";
+            }
+
+            if (signupPanel) {
+                signupPanel.style.display =
+                    "none";
+            }
         }
+
 
         function showSignup() {
-            signupTab.classList.add("active");
-            loginTab.classList.remove("active");
 
-            if (signupPanel) signupPanel.style.display = "";
-            if (loginPanel) loginPanel.style.display = "none";
+            if (signupTab) {
+                signupTab.classList.add(
+                    "active"
+                );
+            }
+
+            if (loginTab) {
+                loginTab.classList.remove(
+                    "active"
+                );
+            }
+
+            if (signupPanel) {
+                signupPanel.style.display = "";
+            }
+
+            if (loginPanel) {
+                loginPanel.style.display =
+                    "none";
+            }
         }
 
-        loginTab.addEventListener("click", event => {
-            event.preventDefault();
+
+        if (loginTab) {
+
+            loginTab.addEventListener(
+                "click",
+                event => {
+
+                    event.preventDefault();
+
+                    showLogin();
+                }
+            );
+        }
+
+
+        if (signupTab) {
+
+            signupTab.addEventListener(
+                "click",
+                event => {
+
+                    event.preventDefault();
+
+                    showSignup();
+                }
+            );
+        }
+
+
+        qsa(
+            "#create-account, " +
+            "#create-account-link, " +
+            ".create-account-link, " +
+            "[data-action='create-account']"
+        ).forEach(button => {
+
+            button.addEventListener(
+                "click",
+                event => {
+
+                    event.preventDefault();
+
+                    showSignup();
+                }
+            );
+        });
+
+
+        qsa(
+            "#back-to-login, " +
+            ".back-to-login, " +
+            "[data-action='back-login']"
+        ).forEach(button => {
+
+            button.addEventListener(
+                "click",
+                event => {
+
+                    event.preventDefault();
+
+                    showLogin();
+                }
+            );
+        });
+
+
+        /*
+         * Default page = Login.
+         */
+
+        if (
+            loginPanel &&
+            signupPanel
+        ) {
             showLogin();
-        });
-
-        signupTab.addEventListener("click", event => {
-            event.preventDefault();
-            showSignup();
-        });
-
-        /* Create Account links/buttons */
-        qsa(
-            "#create-account, #create-account-link, .create-account-link, [data-action='create-account']"
-        ).forEach(button => {
-            button.addEventListener("click", event => {
-                event.preventDefault();
-                showSignup();
-            });
-        });
-
-        /* Back to login */
-        qsa(
-            "#back-to-login, .back-to-login, [data-action='back-login']"
-        ).forEach(button => {
-            button.addEventListener("click", event => {
-                event.preventDefault();
-                showLogin();
-            });
-        });
-
-        /* Default */
-        showLogin();
+        }
     }
+
 
     /* ============================================================
        LOGIN
        ============================================================ */
 
     function initLogin() {
-        const button =
-            $("btn-do-login") ||
-            $("login-submit") ||
-            qs("#login-form button[type='submit']");
 
         const form =
             $("login-form") ||
-            qs("form[data-form='login']");
+            qs(
+                "form[data-form='login']"
+            );
 
-        if (!button && !form) return;
+        const button =
+            $("btn-do-login") ||
+            $("login-submit") ||
+            qs(
+                "#login-form button[type='submit']"
+            );
 
-        const handler = async event => {
+
+        if (!form && !button) {
+            return;
+        }
+
+
+        async function login(event) {
+
             event.preventDefault();
+
 
             const email =
                 $("login_email")?.value.trim() ||
                 $("login-email")?.value.trim() ||
                 "";
 
+
             const password =
                 $("login_password")?.value ||
                 $("login-password")?.value ||
                 "";
 
+
             const message =
                 $("login-message") ||
                 qs(".login-message");
 
+
             if (!email || !password) {
+
                 showMessage(
                     message,
                     "Please enter your email and password.",
                     "error"
                 );
+
                 return;
             }
 
-            setButtonLoading(button, true, "Sign In →");
+
+            setButtonLoading(
+                button,
+                true,
+                "Sign In →"
+            );
+
 
             try {
-                const result = await apiRequest("login", {
-                    email,
-                    password
-                });
+
+                const result =
+                    await apiRequest(
+                        "login",
+                        {
+                            email,
+                            password
+                        }
+                    );
+
 
                 state.loggedIn = true;
-                state.user = result.user || null;
+
+                state.user =
+                    result.user ||
+                    null;
+
 
                 showMessage(
                     message,
-                    result.message || "Login successful.",
+                    result.message ||
+                    "Login successful.",
                     "success"
                 );
 
+
                 /*
-                 * IMPORTANT:
-                 * Reload after login so PHP session becomes available
-                 * and the login page disappears completely.
+                 * Reload page so the PHP session is active.
                  */
+
                 setTimeout(() => {
+
                     window.location.replace(
                         window.location.pathname +
-                        "?logged_in=1&t=" +
+                        "?t=" +
                         Date.now()
                     );
+
                 }, 500);
 
+
             } catch (error) {
+
+                console.error(
+                    "Login error:",
+                    error
+                );
+
+
                 showMessage(
                     message,
-                    error.message || "Login failed.",
+                    error.message ||
+                    "Login failed.",
                     "error"
                 );
 
-                setButtonLoading(button, false, "Sign In →");
+
+                setButtonLoading(
+                    button,
+                    false,
+                    "Sign In →"
+                );
             }
-        };
+        }
+
 
         if (form) {
-            form.addEventListener("submit", handler);
+
+            form.addEventListener(
+                "submit",
+                login
+            );
+
         } else {
-            button.addEventListener("click", handler);
+
+            button.addEventListener(
+                "click",
+                login
+            );
         }
     }
+
 
     /* ============================================================
        CREATE ACCOUNT
        ============================================================ */
 
     function initSignup() {
+
         const form =
             $("signup-form") ||
-            qs("form[data-form='signup']");
+            qs(
+                "form[data-form='signup']"
+            );
 
         const button =
             $("btn-do-signup") ||
             $("signup-submit") ||
-            qs("#signup-form button[type='submit']");
+            qs(
+                "#signup-form button[type='submit']"
+            );
 
-        if (!form && !button) return;
 
-        const handler = async event => {
+        if (!form && !button) {
+            return;
+        }
+
+
+        async function signup(event) {
+
             event.preventDefault();
 
+
             const name =
-                $("signup_name")?.value.trim() || "";
+                $("signup_name")?.value.trim() ||
+                "";
 
             const email =
-                $("signup_email")?.value.trim() || "";
+                $("signup_email")?.value.trim() ||
+                "";
 
             const password =
-                $("signup_pwd")?.value || "";
+                $("signup_pwd")?.value ||
+                "";
 
             const university =
-                $("signup_uni")?.value.trim() || "";
+                $("signup_uni")?.value.trim() ||
+                "";
 
             const branch =
-                $("signup_branch")?.value.trim() || "";
+                $("signup_branch")?.value.trim() ||
+                "";
 
             const major =
-                $("signup_major")?.value.trim() || "";
+                $("signup_major")?.value.trim() ||
+                "";
 
             const gradYear =
-                $("signup_gradyear")?.value.trim() || "";
+                $("signup_gradyear")?.value.trim() ||
+                "";
 
             const linkedin =
-                $("signup_linkedin")?.value.trim() || "";
+                $("signup_linkedin")?.value.trim() ||
+                "";
 
             const github =
-                $("signup_github")?.value.trim() || "";
+                $("signup_github")?.value.trim() ||
+                "";
+
+            const termsElement =
+                $("signup-terms");
 
             const terms =
-                $("signup-terms")?.checked !== false;
+                !termsElement ||
+                termsElement.checked;
+
 
             const message =
                 $("signup-message") ||
                 qs(".signup-message");
 
-            if (!name || !email || !password) {
+
+            if (
+                !name ||
+                !email ||
+                !password
+            ) {
+
                 showMessage(
                     message,
                     "Please fill in all required fields.",
                     "error"
                 );
+
                 return;
             }
+
 
             const passwordRegex =
                 /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
-            if (!passwordRegex.test(password)) {
+
+            if (
+                !passwordRegex.test(
+                    password
+                )
+            ) {
+
                 showMessage(
                     message,
                     "Password must contain at least 8 characters, including uppercase, lowercase, number and special character.",
                     "error"
                 );
+
                 return;
             }
 
+
             if (!terms) {
+
                 showMessage(
                     message,
                     "Please accept the terms and conditions.",
                     "error"
                 );
+
                 return;
             }
 
-            setButtonLoading(button, true, "Create Account");
+
+            setButtonLoading(
+                button,
+                true,
+                "Create Account"
+            );
+
 
             try {
-                const result = await apiRequest("signup", {
-                    name,
-                    email,
-                    password,
-                    university,
-                    branch,
-                    major,
-                    graduation_year: gradYear,
-                    linkedin,
-                    github,
 
-                    /*
-                     * IMPORTANT:
-                     * Do not create a predefined company or role.
-                     */
-                    target_company: "",
-                    target_role: ""
-                });
+                const result =
+                    await apiRequest(
+                        "signup",
+                        {
+                            name,
+                            email,
+                            password,
+                            university,
+                            branch,
+                            major,
+                            graduation_year:
+                                gradYear,
+                            linkedin,
+                            github,
+
+                            /*
+                             * No predefined company.
+                             * No predefined role.
+                             */
+
+                            target_company: "",
+                            target_role: ""
+                        }
+                    );
+
 
                 showMessage(
                     message,
-                    result.message || "Account created successfully.",
+                    result.message ||
+                    "Account created successfully.",
                     "success"
                 );
 
-                /*
-                 * Go back to login tab.
-                 */
-                const loginTab =
-                    $("login-tab") ||
-                    qs('[data-auth-tab="login"]');
 
-                if (loginTab) {
-                    setTimeout(() => {
+                setTimeout(() => {
+
+                    const loginTab =
+                        $("login-tab") ||
+                        qs(
+                            '[data-auth-tab="login"]'
+                        );
+
+                    if (loginTab) {
                         loginTab.click();
+                    }
 
-                        if ($("login_email")) {
-                            $("login_email").value = email;
-                        }
-                    }, 700);
-                }
+                    if ($("login_email")) {
+                        $("login_email").value =
+                            email;
+                    }
+
+                }, 700);
+
 
             } catch (error) {
+
                 showMessage(
                     message,
-                    error.message || "Account creation failed.",
+                    error.message ||
+                    "Account creation failed.",
                     "error"
                 );
 
             } finally {
+
                 setButtonLoading(
                     button,
                     false,
                     "Create Account"
                 );
             }
-        };
+        }
+
 
         if (form) {
-            form.addEventListener("submit", handler);
+
+            form.addEventListener(
+                "submit",
+                signup
+            );
+
         } else {
-            button.addEventListener("click", handler);
+
+            button.addEventListener(
+                "click",
+                signup
+            );
         }
     }
+
 
     /* ============================================================
        PASSWORD TOGGLE
        ============================================================ */
 
     function initPasswordToggles() {
+
         qsa(
-            "#toggle-login-password, #toggle-signup-password, [data-toggle-password]"
+            "#toggle-login-password, " +
+            "#toggle-signup-password, " +
+            "[data-toggle-password]"
         ).forEach(button => {
-            button.addEventListener("click", event => {
-                event.preventDefault();
 
-                let input;
+            button.addEventListener(
+                "click",
+                event => {
 
-                const targetId =
-                    button.dataset.togglePassword;
+                    event.preventDefault();
 
-                if (targetId) {
-                    input = $(targetId);
+
+                    let input = null;
+
+
+                    const targetId =
+                        button.dataset.togglePassword;
+
+
+                    if (targetId) {
+                        input = $(targetId);
+                    }
+
+
+                    if (
+                        !input &&
+                        button.id.includes("login")
+                    ) {
+                        input =
+                            $("login_password");
+                    }
+
+
+                    if (
+                        !input &&
+                        button.id.includes("signup")
+                    ) {
+                        input =
+                            $("signup_pwd");
+                    }
+
+
+                    if (!input) {
+                        return;
+                    }
+
+
+                    if (
+                        input.type ===
+                        "password"
+                    ) {
+
+                        input.type = "text";
+
+                        button.textContent =
+                            "🙈";
+
+                    } else {
+
+                        input.type =
+                            "password";
+
+                        button.textContent =
+                            "👁️";
+                    }
                 }
-
-                if (!input && button.id.includes("login")) {
-                    input = $("login_password");
-                }
-
-                if (!input && button.id.includes("signup")) {
-                    input = $("signup_pwd");
-                }
-
-                if (!input) return;
-
-                if (input.type === "password") {
-                    input.type = "text";
-                    button.textContent = "🙈";
-                } else {
-                    input.type = "password";
-                    button.textContent = "👁️";
-                }
-            });
+            );
         });
     }
+
 
     /* ============================================================
        THEME
        ============================================================ */
 
     function initThemeToggle() {
-        const possibleButtons = [
-            $("theme-toggle"),
-            $("themeToggle"),
-            $("dark-mode-toggle"),
-            $("darkModeToggle"),
-            $("btn-theme"),
-            $("theme-btn"),
-            qs("[data-theme-toggle]")
-        ];
 
-        let toggle = possibleButtons.find(Boolean);
+        let toggle =
+            $("theme-toggle") ||
+            $("themeToggle") ||
+            $("dark-mode-toggle") ||
+            $("darkModeToggle") ||
+            $("btn-theme") ||
+            $("theme-btn") ||
+            qs(
+                "[data-theme-toggle]"
+            );
+
 
         /*
-         * If the HTML does not contain a theme button,
-         * create one in the header.
+         * If no button exists, create one.
          */
+
         if (!toggle) {
+
             const header =
                 qs(".topbar") ||
                 qs(".navbar") ||
                 qs(".header") ||
                 qs("header");
 
+
             if (header) {
-                toggle = document.createElement("button");
+
+                toggle =
+                    document.createElement(
+                        "button"
+                    );
 
                 toggle.type = "button";
-                toggle.id = "theme-toggle";
-                toggle.className = "theme-toggle";
+
+                toggle.id =
+                    "theme-toggle";
+
+                toggle.className =
+                    "theme-toggle";
+
                 toggle.setAttribute(
                     "aria-label",
                     "Toggle theme"
@@ -667,358 +1122,522 @@
 
                 toggle.innerHTML = "🌙";
 
-                header.appendChild(toggle);
+                header.appendChild(
+                    toggle
+                );
             }
         }
 
-        if (!toggle) return;
+
+        if (!toggle) {
+            return;
+        }
+
 
         function applyTheme(theme) {
-            const isDark = theme === "dark";
 
-            document.documentElement.setAttribute(
-                "data-theme",
-                theme
-            );
+            const dark =
+                theme === "dark";
+
+
+            document.documentElement
+                .setAttribute(
+                    "data-theme",
+                    theme
+                );
+
 
             document.body.classList.toggle(
                 "dark-mode",
-                isDark
+                dark
             );
+
 
             document.body.classList.toggle(
                 "dark-theme",
-                isDark
+                dark
             );
+
 
             document.body.classList.toggle(
                 "light-mode",
-                !isDark
+                !dark
             );
+
 
             document.body.classList.toggle(
                 "light-theme",
-                !isDark
+                !dark
             );
+
 
             localStorage.setItem(
                 "skill-gap-theme",
                 theme
             );
 
+
             toggle.setAttribute(
                 "aria-label",
-                isDark
+                dark
                     ? "Switch to light mode"
                     : "Switch to dark mode"
             );
 
+
             /*
-             * Change only the icon.
+             * Change icon only.
              */
+
+            const currentText =
+                toggle.textContent || "";
+
+
             if (
-                toggle.children.length === 0 ||
-                toggle.textContent.includes("🌙") ||
-                toggle.textContent.includes("☀️")
+                currentText.includes("🌙") ||
+                currentText.includes("☀️") ||
+                toggle.children.length === 0
             ) {
-                toggle.textContent = isDark ? "☀️" : "🌙";
+
+                toggle.textContent =
+                    dark
+                        ? "☀️"
+                        : "🌙";
             }
         }
 
-        const savedTheme =
-            localStorage.getItem("skill-gap-theme");
 
-        /*
-         * Default = light mode.
-         */
+        const saved =
+            localStorage.getItem(
+                "skill-gap-theme"
+            );
+
+
         applyTheme(
-            savedTheme === "dark"
+            saved === "dark"
                 ? "dark"
                 : "light"
         );
 
+
         /*
-         * Remove previous listeners by cloning.
+         * Prevent duplicate listeners.
          */
-        const freshToggle =
-            toggle.cloneNode(true);
 
-        toggle.parentNode.replaceChild(
-            freshToggle,
-            toggle
+        if (
+            toggle.dataset.themeBound ===
+            "true"
+        ) {
+            return;
+        }
+
+
+        toggle.dataset.themeBound =
+            "true";
+
+
+        toggle.addEventListener(
+            "click",
+            event => {
+
+                event.preventDefault();
+
+
+                const current =
+                    document.documentElement
+                        .getAttribute(
+                            "data-theme"
+                        ) ||
+                    "light";
+
+
+                applyTheme(
+                    current === "dark"
+                        ? "light"
+                        : "dark"
+                );
+            }
         );
-
-        toggle = freshToggle;
-
-        toggle.addEventListener("click", event => {
-            event.preventDefault();
-
-            const current =
-                document.documentElement.getAttribute(
-                    "data-theme"
-                ) || "light";
-
-            applyTheme(
-                current === "dark"
-                    ? "light"
-                    : "dark"
-            );
-        });
     }
+
 
     /* ============================================================
        AUTH PAGE VISIBILITY
        ============================================================ */
 
-    function controlLoginPageVisibility() {
-        /*
-         * IMPORTANT:
-         * Career URL must NEVER appear on login/signup page.
-         */
+    function hideCareerElementsWhenLoggedOut() {
 
-        const loggedIn =
-            !!APP.loggedIn ||
-            state.loggedIn;
+        if (state.loggedIn) {
+            return;
+        }
 
-        const careerSelectors = [
+
+        const selectors = [
+
             "#career-url-panel",
+
             "#career-url-section",
+
             "#career-url-container",
+
             "#career-scraper",
+
             "#dynamic-career-panel",
+
             ".career-url-panel",
-            ".career-scraper"
+
+            ".career-scraper",
+
+            "#career-url",
+
+            "#dynamic-career-url"
         ];
 
-        careerSelectors.forEach(selector => {
+
+        selectors.forEach(selector => {
+
             qsa(selector).forEach(element => {
-                if (!loggedIn) {
-                    element.style.display = "none";
-                }
+
+                element.style.display =
+                    "none";
+
             });
         });
 
+
         /*
-         * Hide dashboard/sidebar when logged out.
+         * Hide dashboard-specific elements.
          */
-        if (!loggedIn) {
-            qsa(
-                "#dashboard, #app-dashboard, .dashboard-page, .main-app, .app-layout"
-            ).forEach(element => {
-                /*
-                 * Do not hide the actual login container.
-                 */
-                if (
-                    !element.contains($("login-panel")) &&
-                    !element.contains($("signup-panel"))
-                ) {
-                    if (
-                        element.id !== "login-panel" &&
-                        element.id !== "signup-panel"
-                    ) {
-                        element.style.display = "none";
-                    }
-                }
-            });
-        }
+
+        qsa(
+            "#dashboard, " +
+            "#app-dashboard, " +
+            ".dashboard-page, " +
+            ".main-app"
+        ).forEach(element => {
+
+            if (
+                element.id ===
+                "login-panel" ||
+                element.id ===
+                "signup-panel"
+            ) {
+                return;
+            }
+
+            if (
+                element.contains(
+                    $("login-panel")
+                ) ||
+                element.contains(
+                    $("signup-panel")
+                )
+            ) {
+                return;
+            }
+
+            element.style.display =
+                "none";
+        });
     }
 
+
     /* ============================================================
-       NAVIGATION
+       SIDEBAR / NAVIGATION
        ============================================================ */
 
     function initNavigation() {
-        const links = qsa(
+
+        qsa(
             "[data-view], [data-page], [data-section]"
-        );
+        ).forEach(link => {
 
-        if (!links.length) return;
-
-        function showView(viewName) {
-            if (!viewName) return;
-
-            state.currentView = viewName;
-
-            qsa(
-                ".page-view, .dashboard-view, [data-page-view]"
-            ).forEach(view => {
-                const name =
-                    view.dataset.view ||
-                    view.dataset.page ||
-                    view.dataset.section ||
-                    view.id;
-
-                view.style.display =
-                    name === viewName
-                        ? ""
-                        : "none";
-            });
-
-            links.forEach(link => {
-                const name =
-                    link.dataset.view ||
-                    link.dataset.page ||
-                    link.dataset.section;
-
-                link.classList.toggle(
-                    "active",
-                    name === viewName
-                );
-            });
-
-            document.body.dataset.currentView =
-                viewName;
-        }
-
-        links.forEach(link => {
-            link.addEventListener("click", event => {
-                const view =
-                    link.dataset.view ||
-                    link.dataset.page ||
-                    link.dataset.section;
-
-                if (!view) return;
-
-                event.preventDefault();
-
-                showView(view);
-
-                closeMobileSidebar();
-            });
-        });
-    }
-
-    /* ============================================================
-       MOBILE SIDEBAR
-       ============================================================ */
-
-    function closeMobileSidebar() {
-        document.body.classList.remove("sidebar-open");
-
-        qsa(
-            ".sidebar, #sidebar, .side-nav"
-        ).forEach(sidebar => {
-            sidebar.classList.remove("open");
-            sidebar.classList.remove("active");
-        });
-    }
-
-    function initMobileUI() {
-        const menuButtons = qsa(
-            "#menu-toggle, #hamburger, #mobile-menu, .menu-toggle, [data-menu-toggle]"
-        );
-
-        menuButtons.forEach(button => {
-            button.addEventListener("click", event => {
-                event.preventDefault();
-
-                document.body.classList.toggle(
-                    "sidebar-open"
-                );
-
-                qsa(
-                    ".sidebar, #sidebar, .side-nav"
-                ).forEach(sidebar => {
-                    sidebar.classList.toggle(
-                        "open"
-                    );
-
-                    sidebar.classList.toggle(
-                        "active"
-                    );
-                });
-            });
-        });
-
-        qsa(
-            "#sidebar-close, .sidebar-close, [data-sidebar-close]"
-        ).forEach(button => {
-            button.addEventListener(
+            link.addEventListener(
                 "click",
-                closeMobileSidebar
+                event => {
+
+                    const view =
+                        link.dataset.view ||
+                        link.dataset.page ||
+                        link.dataset.section;
+
+
+                    if (!view) {
+                        return;
+                    }
+
+
+                    event.preventDefault();
+
+
+                    qsa(
+                        ".page-view, " +
+                        ".dashboard-view, " +
+                        "[data-page-view]"
+                    ).forEach(page => {
+
+                        const pageName =
+                            page.dataset.view ||
+                            page.dataset.page ||
+                            page.dataset.section ||
+                            page.id;
+
+
+                        page.style.display =
+                            pageName === view
+                                ? ""
+                                : "none";
+                    });
+
+
+                    qsa(
+                        "[data-view], " +
+                        "[data-page], " +
+                        "[data-section]"
+                    ).forEach(item => {
+
+                        const itemView =
+                            item.dataset.view ||
+                            item.dataset.page ||
+                            item.dataset.section;
+
+
+                        item.classList.toggle(
+                            "active",
+                            itemView === view
+                        );
+                    });
+
+
+                    closeSidebar();
+                }
             );
         });
     }
 
+
     /* ============================================================
-       DYNAMIC CAREER URL
+       MOBILE MENU
        ============================================================ */
 
-    function findCareerUrlInput() {
+    function closeSidebar() {
+
+        document.body.classList.remove(
+            "sidebar-open"
+        );
+
+
+        qsa(
+            "#sidebar, " +
+            ".sidebar, " +
+            ".side-nav"
+        ).forEach(sidebar => {
+
+            sidebar.classList.remove(
+                "open"
+            );
+
+            sidebar.classList.remove(
+                "active"
+            );
+        });
+    }
+
+
+    function initMobileMenu() {
+
+        qsa(
+            "#menu-toggle, " +
+            "#hamburger, " +
+            "#mobile-menu, " +
+            ".menu-toggle, " +
+            "[data-menu-toggle]"
+        ).forEach(button => {
+
+            button.addEventListener(
+                "click",
+                event => {
+
+                    event.preventDefault();
+
+
+                    document.body.classList.toggle(
+                        "sidebar-open"
+                    );
+
+
+                    qsa(
+                        "#sidebar, " +
+                        ".sidebar, " +
+                        ".side-nav"
+                    ).forEach(sidebar => {
+
+                        sidebar.classList.toggle(
+                            "open"
+                        );
+
+                        sidebar.classList.toggle(
+                            "active"
+                        );
+                    });
+                }
+            );
+        });
+
+
+        qsa(
+            "#sidebar-close, " +
+            ".sidebar-close, " +
+            "[data-sidebar-close]"
+        ).forEach(button => {
+
+            button.addEventListener(
+                "click",
+                closeSidebar
+            );
+        });
+    }
+
+
+    /* ============================================================
+       CAREER URL INPUT
+       ============================================================ */
+
+    function findCareerURLInput() {
+
         const selectors = [
+
             "#career-url",
+
             "#career_url",
+
             "#scrape-url",
+
             "#job-url",
+
             "#target-url",
+
             "#url-input",
+
             "#careerUrl",
+
             "input[name='career_url']",
+
             "input[name='careerUrl']"
         ];
 
-        for (const selector of selectors) {
-            const element = qs(selector);
 
-            if (element) return element;
+        for (
+            const selector of selectors
+        ) {
+
+            const element =
+                qs(selector);
+
+            if (element) {
+                return element;
+            }
         }
+
 
         return null;
     }
 
-    function findCareerScrapeButton() {
+
+    function findCareerButton() {
+
         const selectors = [
+
             "#scrape",
+
             "#btn-scrape",
+
             "#btn-scrape-url",
+
             "#scrape-url-btn",
+
             "#load-careers",
+
             "#find-jobs",
-            "#career-scrape-btn"
+
+            "#career-scrape-btn",
+
+            "#dynamic-career-scrape-btn"
         ];
 
-        for (const selector of selectors) {
-            const element = qs(selector);
 
-            if (element) return element;
+        for (
+            const selector of selectors
+        ) {
+
+            const element =
+                qs(selector);
+
+            if (element) {
+                return element;
+            }
         }
+
 
         return null;
     }
 
-    function createCareerURLPanel() {
-        /*
-         * NEVER create this on login/signup page.
-         */
-        if (!state.loggedIn) return;
 
-        if ($("dynamic-career-panel")) {
+    /* ============================================================
+       CREATE DYNAMIC CAREER PANEL
+       ============================================================ */
+
+    function createCareerPanel() {
+
+        /*
+         * NEVER create Career URL on Login/Create Account page.
+         */
+
+        if (!state.loggedIn) {
             return;
         }
 
+
+        if (
+            $("dynamic-career-panel")
+        ) {
+            return;
+        }
+
+
         const sidebar =
-            qs("#sidebar") ||
+            $("sidebar") ||
             qs(".sidebar") ||
             qs(".side-nav");
 
-        if (!sidebar) return;
+
+        if (!sidebar) {
+            return;
+        }
+
 
         const panel =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
+
 
         panel.id =
             "dynamic-career-panel";
 
+
         panel.className =
             "career-url-panel";
 
+
         panel.innerHTML = `
+
             <div class="career-url-title">
                 Career URL
             </div>
 
             <div class="career-url-description">
-                Paste a careers or jobs page URL to find current roles.
+                Paste a careers or jobs page URL.
             </div>
 
             <input
@@ -1041,23 +1660,46 @@
             ></div>
         `;
 
-        sidebar.prepend(panel);
+
+        sidebar.prepend(
+            panel
+        );
     }
 
-    function getCareerUrl() {
+
+    /* ============================================================
+       GET CAREER URL
+       ============================================================ */
+
+    function getCareerURL() {
+
         const input =
-            findCareerUrlInput() ||
+            findCareerURLInput() ||
             $("dynamic-career-url");
 
-        return input
-            ? input.value.trim()
-            : "";
+
+        if (!input) {
+            return "";
+        }
+
+
+        return input.value.trim();
     }
 
+
+    /* ============================================================
+       NORMALIZE JOB
+       ============================================================ */
+
     function normalizeJob(job) {
-        if (!job || typeof job !== "object") {
+
+        if (
+            !job ||
+            typeof job !== "object"
+        ) {
             return null;
         }
+
 
         const title =
             job.title ||
@@ -1065,11 +1707,13 @@
             job.position ||
             "";
 
+
         const company =
             job.company ||
             job.organization ||
             job.employer ||
             "";
+
 
         let skills =
             job.required_skills ||
@@ -1078,338 +1722,553 @@
             job.requirements ||
             [];
 
-        if (typeof skills === "string") {
-            skills = skills
-                .split(/[,;\n|]/)
-                .map(x => x.trim())
-                .filter(Boolean);
+
+        if (
+            typeof skills === "string"
+        ) {
+
+            skills =
+                skills
+                    .split(
+                        /[,;\n|]/
+                    )
+                    .map(
+                        x => x.trim()
+                    )
+                    .filter(Boolean);
         }
 
+
         return {
+
             ...job,
-            title: safeText(title),
-            role: safeText(job.role || title),
-            company: safeText(company),
+
+            title:
+                text(title),
+
+            role:
+                text(
+                    job.role ||
+                    title
+                ),
+
+            company:
+                text(company),
+
             required_skills:
-                normalizeSkills(skills),
+                normalizeSkills(
+                    skills
+                ),
+
             url:
                 job.url ||
                 job.link ||
                 job.apply_url ||
                 "",
+
             location:
                 job.location ||
                 "",
+
             description:
                 job.description ||
                 ""
         };
     }
 
+
     function normalizeJobs(jobs) {
-        if (!Array.isArray(jobs)) return [];
+
+        if (!Array.isArray(jobs)) {
+            return [];
+        }
+
 
         return jobs
             .map(normalizeJob)
-            .filter(job => job && job.title);
+            .filter(
+                job =>
+                    job &&
+                    job.title
+            );
     }
 
+
     /* ============================================================
-       JOB MATCHING
+       MATCHING
        ============================================================ */
 
-    function skillMatches(resumeSkill, requiredSkill) {
-        const a = normalizeSkill(resumeSkill);
-        const b = normalizeSkill(requiredSkill);
+    function skillMatches(
+        resumeSkill,
+        requiredSkill
+    ) {
 
-        if (!a || !b) return false;
+        const a =
+            normalizeSkill(
+                resumeSkill
+            );
 
-        if (a === b) return true;
+        const b =
+            normalizeSkill(
+                requiredSkill
+            );
 
-        /*
-         * Safe partial matching for longer technical terms.
-         */
+
+        if (!a || !b) {
+            return false;
+        }
+
+
+        if (a === b) {
+            return true;
+        }
+
+
         if (
             a.length >= 4 &&
             b.length >= 4 &&
-            (a.includes(b) || b.includes(a))
+            (
+                a.includes(b) ||
+                b.includes(a)
+            )
         ) {
             return true;
         }
 
+
         return false;
     }
 
-    function calculateJobMatch(job, resumeSkills) {
+
+    function calculateMatch(
+        job,
+        resumeSkills
+    ) {
+
         const required =
-            normalizeSkills(job.required_skills);
+            normalizeSkills(
+                job.required_skills
+            );
+
 
         const resume =
-            normalizeSkills(resumeSkills);
+            normalizeSkills(
+                resumeSkills
+            );
+
 
         if (!required.length) {
+
             return {
+
                 score: 0,
+
                 matched: [],
+
                 missing: [],
+
                 hasRequirements: false
             };
         }
 
+
         const matched = [];
         const missing = [];
 
-        required.forEach(requiredSkill => {
-            const found = resume.some(
-                resumeSkill =>
-                    skillMatches(
-                        resumeSkill,
+
+        required.forEach(
+            requiredSkill => {
+
+                const exists =
+                    resume.some(
+                        resumeSkill =>
+                            skillMatches(
+                                resumeSkill,
+                                requiredSkill
+                            )
+                    );
+
+
+                if (exists) {
+
+                    matched.push(
                         requiredSkill
-                    )
-            );
+                    );
 
-            if (found) {
-                matched.push(requiredSkill);
-            } else {
-                missing.push(requiredSkill);
+                } else {
+
+                    missing.push(
+                        requiredSkill
+                    );
+                }
             }
-        });
-
-        const score = Math.round(
-            (matched.length / required.length) * 100
         );
 
+
+        const score =
+            Math.round(
+                (
+                    matched.length /
+                    required.length
+                ) * 100
+            );
+
+
         return {
+
             score,
+
             matched,
+
             missing,
+
             hasRequirements: true
         };
     }
 
+
     function rankJobs(jobs) {
+
         return normalizeJobs(jobs)
             .map(job => {
+
                 const match =
-                    calculateJobMatch(
+                    calculateMatch(
                         job,
                         state.extractedSkills
                     );
 
+
                 return {
+
                     ...job,
-                    matchScore: match.score,
-                    matchedSkills: match.matched,
-                    missingSkills: match.missing,
+
+                    matchScore:
+                        match.score,
+
+                    matchedSkills:
+                        match.matched,
+
+                    missingSkills:
+                        match.missing,
+
                     hasRequirements:
                         match.hasRequirements
                 };
             })
-            .sort((a, b) => {
-                if (b.matchScore !== a.matchScore) {
-                    return b.matchScore - a.matchScore;
-                }
+            .sort(
+                (a, b) => {
 
-                return (
-                    b.matchedSkills.length -
-                    a.matchedSkills.length
-                );
-            });
+                    if (
+                        b.matchScore !==
+                        a.matchScore
+                    ) {
+
+                        return (
+                            b.matchScore -
+                            a.matchScore
+                        );
+                    }
+
+
+                    return (
+                        b.matchedSkills.length -
+                        a.matchedSkills.length
+                    );
+                }
+            );
     }
 
+
     /* ============================================================
-       JOB RESULTS UI
+       JOB RESULTS
        ============================================================ */
 
-    function getJobResultsContainer() {
+    function getJobContainer() {
+
         const selectors = [
+
             "#job-results",
+
             "#career-jobs",
+
             "#job-ranking-results",
+
             "#job-results-container",
+
             ".job-results"
         ];
 
-        for (const selector of selectors) {
-            const element = qs(selector);
 
-            if (element) return element;
+        for (
+            const selector of selectors
+        ) {
+
+            const element =
+                qs(selector);
+
+            if (element) {
+                return element;
+            }
         }
+
 
         return null;
     }
 
-    function renderJobResults(jobs) {
-        const container =
-            getJobResultsContainer();
 
-        if (!container) return;
+    function renderJobs(jobs) {
+
+        const container =
+            getJobContainer();
+
+
+        if (!container) {
+            return;
+        }
+
 
         const ranked =
             rankJobs(jobs);
 
+
         if (!ranked.length) {
+
             container.innerHTML = `
+
                 <div class="empty-state">
                     No jobs were detected from the career URL.
                 </div>
+
             `;
+
             return;
         }
 
+
         container.innerHTML = `
+
             <div class="job-results-header">
-                <h3>Available Career Opportunities</h3>
-                <span>${ranked.length} role(s) found</span>
+
+                <h3>
+                    Career Opportunities
+                </h3>
+
+                <span>
+                    ${ranked.length} role(s) found
+                </span>
+
             </div>
 
+
             <div class="dynamic-job-list">
-                ${ranked.map((job, index) => `
+
+                ${ranked.map(
+                    (job, index) => `
+
                     <div
                         class="dynamic-job-card ${
-                            index === 0 && state.extractedSkills.length
+                            index === 0 &&
+                            state.extractedSkills.length
                                 ? "recommended"
                                 : ""
                         }"
-                        data-job-index="${index}"
                     >
 
                         <div class="job-card-header">
+
                             <div>
+
                                 <h4>
-                                    ${escapeHtml(job.title)}
+                                    ${escapeHtml(
+                                        job.title
+                                    )}
                                 </h4>
 
                                 ${
                                     job.company
-                                        ? `<div class="job-company">
-                                            ${escapeHtml(job.company)}
-                                           </div>`
+                                        ? `
+                                            <div class="job-company">
+                                                ${escapeHtml(
+                                                    job.company
+                                                )}
+                                            </div>
+                                          `
                                         : ""
                                 }
+
                             </div>
 
-                            ${
-                                job.hasRequirements
-                                    ? `<div class="job-match-score">
-                                        ${job.matchScore}% Match
-                                       </div>`
-                                    : `<div class="job-match-score">
-                                        Requirements unavailable
-                                       </div>`
-                            }
+
+                            <div class="job-match-score">
+
+                                ${
+                                    job.hasRequirements
+                                        ? job.matchScore +
+                                          "% Match"
+                                        : "Requirements unavailable"
+                                }
+
+                            </div>
+
                         </div>
+
 
                         ${
                             job.location
-                                ? `<div class="job-location">
-                                    ${escapeHtml(job.location)}
-                                   </div>`
+                                ? `
+                                    <div class="job-location">
+                                        ${escapeHtml(
+                                            job.location
+                                        )}
+                                    </div>
+                                  `
                                 : ""
                         }
+
 
                         ${
                             job.hasRequirements
                                 ? `
-                                <div class="job-skills">
-                                    ${
-                                        job.matchedSkills.length
-                                            ? `
-                                            <div>
-                                                <strong>Matched:</strong>
-                                                ${job.matchedSkills
-                                                    .map(skill =>
-                                                        `<span class="skill matched">
-                                                            ${escapeHtml(skill)}
-                                                         </span>`
-                                                    )
-                                                    .join("")}
-                                            </div>
-                                            `
-                                            : ""
-                                    }
 
-                                    ${
-                                        job.missingSkills.length
-                                            ? `
-                                            <div>
-                                                <strong>Missing:</strong>
-                                                ${job.missingSkills
-                                                    .map(skill =>
-                                                        `<span class="skill missing">
-                                                            ${escapeHtml(skill)}
-                                                         </span>`
-                                                    )
-                                                    .join("")}
-                                            </div>
-                                            `
-                                            : ""
-                                    }
-                                </div>
-                                `
+                                    <div class="job-skills">
+
+                                        ${
+                                            job.matchedSkills.length
+                                                ? `
+                                                    <div>
+                                                        <strong>
+                                                            Matched:
+                                                        </strong>
+
+                                                        ${job.matchedSkills
+                                                            .map(
+                                                                skill =>
+                                                                    `
+                                                                    <span class="skill matched">
+                                                                        ${escapeHtml(
+                                                                            skill
+                                                                        )}
+                                                                    </span>
+                                                                    `
+                                                            )
+                                                            .join("")}
+                                                    </div>
+                                                  `
+                                                : ""
+                                        }
+
+
+                                        ${
+                                            job.missingSkills.length
+                                                ? `
+                                                    <div>
+                                                        <strong>
+                                                            Missing:
+                                                        </strong>
+
+                                                        ${job.missingSkills
+                                                            .map(
+                                                                skill =>
+                                                                    `
+                                                                    <span class="skill missing">
+                                                                        ${escapeHtml(
+                                                                            skill
+                                                                        )}
+                                                                    </span>
+                                                                    `
+                                                            )
+                                                            .join("")}
+                                                    </div>
+                                                  `
+                                                : ""
+                                        }
+
+                                    </div>
+
+                                  `
                                 : ""
                         }
+
 
                         <div class="job-card-actions">
 
                             <button
                                 type="button"
                                 class="use-job-btn"
-                                data-job-index="${index}"
+                                data-index="${index}"
                             >
                                 Use This Job
                             </button>
 
+
                             ${
                                 job.url
                                     ? `
-                                    <a
-                                        href="${escapeHtml(job.url)}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="job-link"
-                                    >
-                                        View Job
-                                    </a>
-                                    `
+                                        <a
+                                            href="${escapeHtml(
+                                                job.url
+                                            )}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="job-link"
+                                        >
+                                            View Job
+                                        </a>
+                                      `
                                     : ""
                             }
 
                         </div>
+
                     </div>
-                `).join("")}
+
+                `
+                ).join("")}
+
             </div>
         `;
+
 
         qsa(
             ".use-job-btn",
             container
         ).forEach(button => {
+
             button.addEventListener(
                 "click",
-                () => {
+                async () => {
+
                     const index =
                         Number(
-                            button.dataset.jobIndex
+                            button.dataset.index
                         );
+
 
                     const selected =
                         ranked[index];
 
+
                     if (selected) {
-                        useJobAsTarget(selected);
+
+                        await useJob(
+                            selected
+                        );
                     }
                 }
             );
         });
     }
 
+
     /* ============================================================
-       USE JOB AS TARGET
+       SELECT JOB
        ============================================================ */
 
-    async function useJobAsTarget(job) {
-        state.recommendedJob = job;
+    async function useJob(job) {
+
+        state.recommendedJob =
+            job;
 
         state.targetCompany =
             job.company || "";
@@ -1424,6 +2283,7 @@
                 job.required_skills
             );
 
+
         APP.targetCompany =
             state.targetCompany;
 
@@ -1436,9 +2296,12 @@
         APP.recommendedJob =
             job;
 
-        updateTargetLabels();
+
+        updateTargetUI();
+
 
         try {
+
             await apiRequest(
                 "get_metrics",
                 {
@@ -1452,58 +2315,74 @@
                         state.requiredSkills
                 }
             );
+
         } catch (error) {
+
             console.warn(
-                "Could not save target:",
+                "Target save warning:",
                 error.message
             );
         }
 
-        renderJobRecommendation(job);
-        renderSkills();
-        renderATS();
-        renderTargetInfo();
+
+        renderRecommendation(
+            job
+        );
     }
+
 
     /* ============================================================
        SCRAPE CAREER URL
        ============================================================ */
 
     async function scrapeCareerURL() {
+
         if (!state.loggedIn) {
             return;
         }
 
-        const url = getCareerUrl();
+
+        const url =
+            getCareerURL();
+
 
         const status =
             $("dynamic-career-status") ||
             $("career-url-status") ||
             $("scrape-status");
 
+
         const button =
-            findCareerScrapeButton() ||
-            $("dynamic-career-scrape-btn");
+            findCareerButton();
+
 
         if (!url) {
+
             showMessage(
                 status,
                 "Please enter a career or jobs URL.",
                 "error"
             );
+
             return;
         }
 
+
         if (
-            !/^https?:\/\/.+/i.test(url)
+            !/^https?:\/\/.+/i.test(
+                url
+            )
         ) {
+
             showMessage(
                 status,
                 "Please enter a valid URL beginning with http:// or https://.",
                 "error"
             );
+
             return;
         }
+
 
         setButtonLoading(
             button,
@@ -1511,19 +2390,25 @@
             "Find Jobs"
         );
 
+
         showMessage(
             status,
             "Reading jobs from the career page...",
             "info"
         );
 
+
         try {
+
             const result =
                 await apiRequest(
                     "scrape_url",
-                    { url },
+                    {
+                        url
+                    },
                     90000
                 );
+
 
             const jobs =
                 normalizeJobs(
@@ -1533,19 +2418,30 @@
                     []
                 );
 
-            state.careerJobs = jobs;
 
-            renderJobResults(jobs);
+            state.careerUrl =
+                url;
+
+            state.careerJobs =
+                jobs;
+
+
+            renderJobs(
+                jobs
+            );
+
 
             if (!jobs.length) {
+
                 showMessage(
                     status,
-                    "The page was reached, but no job listings were detected.",
+                    "No job listings were detected from this page.",
                     "error"
                 );
 
                 return;
             }
+
 
             showMessage(
                 status,
@@ -1553,26 +2449,40 @@
                 "success"
             );
 
-            /*
-             * Automatically select the best match only
-             * when an actual resume has been uploaded.
-             */
-            if (state.extractedSkills.length) {
-                const ranked =
-                    rankJobs(jobs);
 
-                if (ranked.length) {
-                    await useJobAsTarget(
+            /*
+             * If resume already exists,
+             * automatically calculate matches.
+             */
+
+            if (
+                state.extractedSkills.length
+            ) {
+
+                const ranked =
+                    rankJobs(
+                        jobs
+                    );
+
+
+                if (
+                    ranked.length
+                ) {
+
+                    await useJob(
                         ranked[0]
                     );
                 }
             }
 
+
         } catch (error) {
+
             console.error(
-                "Career scraping error:",
+                "Career URL error:",
                 error
             );
+
 
             showMessage(
                 status,
@@ -1581,7 +2491,9 @@
                 "error"
             );
 
+
         } finally {
+
             setButtonLoading(
                 button,
                 false,
@@ -1590,84 +2502,127 @@
         }
     }
 
-    function initDynamicCareerURL() {
+
+    /* ============================================================
+       CAREER URL INITIALIZATION
+       ============================================================ */
+
+    function initCareerURL() {
+
         /*
-         * VERY IMPORTANT:
-         * Never initialize the Career URL panel on login.
+         * Critical:
+         * Do NOT run this on login/signup.
          */
+
         if (!state.loggedIn) {
-            controlLoginPageVisibility();
             return;
         }
 
-        createCareerURLPanel();
+
+        createCareerPanel();
+
 
         const input =
-            findCareerUrlInput() ||
+            findCareerURLInput() ||
             $("dynamic-career-url");
 
+
         const button =
-            findCareerScrapeButton() ||
-            $("dynamic-career-scrape-btn");
+            findCareerButton();
+
 
         if (button) {
+
             button.addEventListener(
                 "click",
                 event => {
+
                     event.preventDefault();
+
                     scrapeCareerURL();
                 }
             );
         }
 
+
         if (input) {
+
+            if (state.careerUrl) {
+                input.value =
+                    state.careerUrl;
+            }
+
+
             input.addEventListener(
                 "keydown",
                 event => {
-                    if (event.key === "Enter") {
+
+                    if (
+                        event.key ===
+                        "Enter"
+                    ) {
+
                         event.preventDefault();
+
                         scrapeCareerURL();
                     }
                 }
             );
-
-            if (APP.careerUrl) {
-                input.value =
-                    APP.careerUrl;
-            }
         }
     }
+
 
     /* ============================================================
        RESUME UPLOAD
        ============================================================ */
 
     function findResumeInput() {
+
         const selectors = [
+
             "#resume_file",
+
             "#resume-file",
+
             "#resume",
+
             "#resume_upload",
+
             "input[name='resume']",
-            "input[type='file'][accept*='pdf']"
+
+            "input[type='file']"
         ];
 
-        for (const selector of selectors) {
-            const input = qs(selector);
 
-            if (input) return input;
+        for (
+            const selector of selectors
+        ) {
+
+            const input =
+                qs(selector);
+
+            if (input) {
+                return input;
+            }
         }
+
 
         return null;
     }
 
+
     async function uploadResume(file) {
-        if (!file) return;
+
+        if (!file) {
+            return;
+        }
+
 
         const status =
             $("resume-status") ||
             $("upload-status") ||
             $("resume-message");
+
 
         showMessage(
             status,
@@ -1675,7 +2630,9 @@
             "info"
         );
 
+
         try {
+
             const result =
                 await apiRequest(
                     "upload_resume",
@@ -1685,6 +2642,7 @@
                     90000
                 );
 
+
             state.extractedSkills =
                 normalizeSkills(
                     result.extracted_skills ||
@@ -1693,6 +2651,7 @@
                     []
                 );
 
+
             state.atsScore =
                 Number(
                     result.ats_score ||
@@ -1700,14 +2659,18 @@
                     0
                 );
 
+
             APP.extractedSkills =
                 state.extractedSkills;
 
             APP.atsScore =
                 state.atsScore;
 
+
             renderSkills();
+
             renderATS();
+
 
             showMessage(
                 status,
@@ -1716,27 +2679,39 @@
                 "success"
             );
 
+
             /*
-             * Recalculate career matches.
+             * Recalculate jobs.
              */
-            if (state.careerJobs.length) {
+
+            if (
+                state.careerJobs.length
+            ) {
+
+                renderJobs(
+                    state.careerJobs
+                );
+
+
                 const ranked =
                     rankJobs(
                         state.careerJobs
                     );
 
-                renderJobResults(
-                    state.careerJobs
-                );
 
-                if (ranked.length) {
-                    await useJobAsTarget(
+                if (
+                    ranked.length
+                ) {
+
+                    await useJob(
                         ranked[0]
                     );
                 }
             }
 
+
         } catch (error) {
+
             showMessage(
                 status,
                 error.message ||
@@ -1746,219 +2721,323 @@
         }
     }
 
+
     function initResumeUpload() {
+
         const input =
             findResumeInput();
 
-        if (!input) return;
+
+        if (!input) {
+            return;
+        }
+
 
         input.addEventListener(
             "change",
             () => {
+
                 const file =
                     input.files &&
                     input.files[0];
 
+
                 if (file) {
-                    uploadResume(file);
+                    uploadResume(
+                        file
+                    );
                 }
             }
         );
     }
 
+
     /* ============================================================
-       SKILL DISPLAY
+       SKILLS
        ============================================================ */
 
     function renderSkills() {
+
         const containers = [
+
             $("extracted-skills"),
+
             $("resume-skills"),
+
             $("skills-list"),
+
             $("skill-list")
         ].filter(Boolean);
 
-        if (!containers.length) return;
 
-        containers.forEach(container => {
-            if (!state.extractedSkills.length) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        Upload a resume to extract your skills.
-                    </div>
-                `;
-                return;
+        containers.forEach(
+            container => {
+
+                if (
+                    !state.extractedSkills.length
+                ) {
+
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            Upload a resume to extract your skills.
+                        </div>
+                    `;
+
+                    return;
+                }
+
+
+                container.innerHTML =
+                    state.extractedSkills
+                        .map(
+                            skill =>
+                                `
+                                <span class="skill-tag">
+                                    ${escapeHtml(
+                                        skill
+                                    )}
+                                </span>
+                                `
+                        )
+                        .join("");
             }
-
-            container.innerHTML =
-                state.extractedSkills
-                    .map(skill =>
-                        `<span class="skill-tag">
-                            ${escapeHtml(skill)}
-                         </span>`
-                    )
-                    .join("");
-        });
+        );
     }
+
 
     /* ============================================================
        ATS
        ============================================================ */
 
     function renderATS() {
+
         const score =
-            Number(state.atsScore || 0);
+            Math.max(
+                0,
+                Math.min(
+                    100,
+                    Number(
+                        state.atsScore ||
+                        0
+                    )
+                )
+            );
 
-        const scoreElements = [
-            $("ats-score"),
-            $("atsScore"),
-            $("ats-score-value")
-        ].filter(Boolean);
 
-        scoreElements.forEach(element => {
-            element.textContent =
-                `${Math.round(score)}%`;
-        });
+        qsa(
+            "#ats-score, " +
+            "#atsScore, " +
+            "#ats-score-value"
+        ).forEach(
+            element => {
+
+                element.textContent =
+                    Math.round(score) +
+                    "%";
+            }
+        );
+
 
         const progress =
-            qs(".ats-progress-bar") ||
-            $("ats-progress");
+            $("ats-progress") ||
+            qs(
+                ".ats-progress-bar"
+            );
+
 
         if (progress) {
+
             progress.style.width =
-                Math.max(
-                    0,
-                    Math.min(100, score)
-                ) + "%";
+                score + "%";
         }
     }
 
+
     /* ============================================================
-       TARGET INFORMATION
+       TARGET UI
        ============================================================ */
 
-    function updateTargetLabels() {
+    function updateTargetUI() {
+
         const role =
             state.targetRole ||
             "No career role selected";
 
+
         const company =
-            state.targetCompany;
+            state.targetCompany ||
+            "Dynamic career target";
+
 
         qsa(
-            "#target-role, #targetRole, .target-role"
-        ).forEach(element => {
-            element.textContent =
-                role;
-        });
+            "#target-role, " +
+            "#targetRole, " +
+            ".target-role"
+        ).forEach(
+            element => {
+
+                element.textContent =
+                    role;
+            }
+        );
+
 
         qsa(
-            "#target-company, #targetCompany, .target-company"
-        ).forEach(element => {
-            element.textContent =
-                company || "Dynamic career target";
-        });
-    }
+            "#target-company, " +
+            "#targetCompany, " +
+            ".target-company"
+        ).forEach(
+            element => {
 
-    function renderTargetInfo() {
-        updateTargetLabels();
+                element.textContent =
+                    company;
+            }
+        );
+
 
         qsa(
-            ".required-skills, #required-skills"
-        ).forEach(container => {
-            container.innerHTML =
-                state.requiredSkills.length
-                    ? state.requiredSkills
-                        .map(skill =>
-                            `<span class="skill-tag required">
-                                ${escapeHtml(skill)}
-                             </span>`
-                        )
-                        .join("")
-                    : `
+            "#required-skills, " +
+            ".required-skills"
+        ).forEach(
+            container => {
+
+                if (
+                    !state.requiredSkills.length
+                ) {
+
+                    container.innerHTML = `
                         <div class="empty-state">
                             No job requirements detected yet.
                         </div>
                     `;
-        });
+
+                    return;
+                }
+
+
+                container.innerHTML =
+                    state.requiredSkills
+                        .map(
+                            skill =>
+                                `
+                                <span class="skill-tag required">
+                                    ${escapeHtml(
+                                        skill
+                                    )}
+                                </span>
+                                `
+                        )
+                        .join("");
+            }
+        );
     }
 
-    function renderJobRecommendation(job) {
-        if (!job) return;
 
-        const containers = [
-            $("recommended-job"),
-            $("job-recommendation"),
-            $("recommendedJob")
-        ].filter(Boolean);
+    /* ============================================================
+       RECOMMENDATION
+       ============================================================ */
 
-        containers.forEach(container => {
-            container.innerHTML = `
-                <div class="recommendation-card">
-                    <div class="recommendation-label">
-                        Recommended Match
-                    </div>
+    function renderRecommendation(
+        job
+    ) {
 
-                    <h3>
-                        ${escapeHtml(
-                            job.title ||
-                            job.role ||
-                            ""
-                        )}
-                    </h3>
+        if (!job) {
+            return;
+        }
 
-                    ${
-                        job.company
-                            ? `<p>
-                                ${escapeHtml(job.company)}
-                               </p>`
-                            : ""
-                    }
 
-                    <strong>
+        qsa(
+            "#recommended-job, " +
+            "#job-recommendation, " +
+            "#recommendedJob"
+        ).forEach(
+            container => {
+
+                container.innerHTML = `
+
+                    <div class="recommendation-card">
+
+                        <div class="recommendation-label">
+                            Recommended Match
+                        </div>
+
+                        <h3>
+                            ${escapeHtml(
+                                job.title ||
+                                job.role ||
+                                ""
+                            )}
+                        </h3>
+
                         ${
-                            job.matchScore != null
-                                ? `${job.matchScore}% skill match`
+                            job.company
+                                ? `
+                                    <p>
+                                        ${escapeHtml(
+                                            job.company
+                                        )}
+                                    </p>
+                                  `
                                 : ""
                         }
-                    </strong>
-                </div>
-            `;
-        });
+
+                        ${
+                            job.matchScore !== undefined
+                                ? `
+                                    <strong>
+                                        ${job.matchScore}% skill match
+                                    </strong>
+                                  `
+                                : ""
+                        }
+
+                    </div>
+
+                `;
+            }
+        );
     }
+
 
     /* ============================================================
        PROFILE
        ============================================================ */
 
-    function initProfileForm() {
+    function initProfile() {
+
         const form =
             $("profile-form");
 
-        if (!form) return;
+
+        if (!form) {
+            return;
+        }
+
 
         form.addEventListener(
             "submit",
             async event => {
+
                 event.preventDefault();
 
-                const formData =
-                    new FormData(form);
 
-                formData.delete("action");
-                formData.append(
-                    "action",
-                    "update_profile"
-                );
+                const data =
+                    Object.fromEntries(
+                        new FormData(
+                            form
+                        ).entries()
+                    );
+
 
                 const button =
                     form.querySelector(
                         "button[type='submit']"
                     );
 
+
                 const message =
-                    $("profile-message") ||
-                    qs(".profile-message");
+                    $("profile-message");
+
 
                 setButtonLoading(
                     button,
@@ -1966,19 +3045,21 @@
                     "Save Changes"
                 );
 
+
                 try {
+
                     const result =
                         await apiRequest(
                             "update_profile",
-                            Object.fromEntries(
-                                formData.entries()
-                            )
+                            data
                         );
+
 
                     if (result.user) {
                         state.user =
                             result.user;
                     }
+
 
                     showMessage(
                         message,
@@ -1987,7 +3068,9 @@
                         "success"
                     );
 
+
                 } catch (error) {
+
                     showMessage(
                         message,
                         error.message ||
@@ -1995,7 +3078,9 @@
                         "error"
                     );
 
+
                 } finally {
+
                     setButtonLoading(
                         button,
                         false,
@@ -2006,34 +3091,45 @@
         );
     }
 
+
     /* ============================================================
        ROADMAP
        ============================================================ */
 
     async function loadRoadmap() {
+
         const container =
             $("roadmap-content") ||
             $("roadmap-container") ||
             $("roadmap-results");
 
-        if (!container) return;
+
+        if (!container) {
+            return;
+        }
+
 
         if (!state.targetRole) {
+
             container.innerHTML = `
                 <div class="empty-state">
                     Select a job from your career URL first.
                 </div>
             `;
+
             return;
         }
 
+
         container.innerHTML = `
             <div class="loading-state">
-                Generating your roadmap...
+                Generating roadmap...
             </div>
         `;
 
+
         try {
+
             const result =
                 await apiRequest(
                     "get_roadmap",
@@ -2049,74 +3145,105 @@
                     }
                 );
 
+
             const roadmap =
                 result.roadmap ||
                 result.data ||
                 result.result ||
                 [];
 
-            if (Array.isArray(roadmap)) {
+
+            if (
+                Array.isArray(
+                    roadmap
+                )
+            {
+
                 container.innerHTML =
                     roadmap
-                        .map((item, index) =>
-                            `<div class="roadmap-item">
-                                <div class="roadmap-number">
-                                    ${index + 1}
+                        .map(
+                            (item, index) =>
+                                `
+                                <div class="roadmap-item">
+
+                                    <div class="roadmap-number">
+                                        ${index + 1}
+                                    </div>
+
+                                    <div>
+
+                                        <h4>
+                                            ${escapeHtml(
+                                                item.title ||
+                                                item.skill ||
+                                                item.topic ||
+                                                `Step ${index + 1}`
+                                            )}
+                                        </h4>
+
+                                        <p>
+                                            ${escapeHtml(
+                                                item.description ||
+                                                item.details ||
+                                                ""
+                                            )}
+                                        </p>
+
+                                    </div>
+
                                 </div>
-                                <div>
-                                    <h4>
-                                        ${escapeHtml(
-                                            item.title ||
-                                            item.skill ||
-                                            item.topic ||
-                                            `Step ${index + 1}`
-                                        )}
-                                    </h4>
-                                    <p>
-                                        ${escapeHtml(
-                                            item.description ||
-                                            item.details ||
-                                            ""
-                                        )}
-                                    </p>
-                                </div>
-                             </div>`
+                                `
                         )
                         .join("");
+
             } else {
+
                 container.textContent =
-                    safeText(roadmap);
+                    text(roadmap);
             }
 
+
         } catch (error) {
+
             container.innerHTML = `
                 <div class="form-message error">
-                    ${escapeHtml(error.message)}
+                    ${escapeHtml(
+                        error.message
+                    )}
                 </div>
             `;
         }
     }
+
 
     /* ============================================================
        INTERVIEW
        ============================================================ */
 
     async function loadInterview() {
+
         const container =
             $("interview-content") ||
             $("interview-container") ||
             $("interview-results");
 
-        if (!container) return;
 
-        if (!state.targetRole) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    Select a job from the career URL first.
-                </div>
-            `;
+        if (!container) {
             return;
         }
+
+
+        if (!state.targetRole) {
+
+            container.innerHTML = `
+                <div class="empty-state">
+                    Select a job from your career URL first.
+                </div>
+            `;
+
+            return;
+        }
+
 
         container.innerHTML = `
             <div class="loading-state">
@@ -2124,7 +3251,9 @@
             </div>
         `;
 
+
         try {
+
             const result =
                 await apiRequest(
                     "get_interview",
@@ -2140,80 +3269,124 @@
                     }
                 );
 
+
             const questions =
                 result.questions ||
                 result.interview_questions ||
                 result.data ||
                 [];
 
-            if (Array.isArray(questions)) {
+
+            if (
+                Array.isArray(
+                    questions
+                )
+            {
+
                 container.innerHTML =
                     questions
-                        .map((question, index) =>
-                            `<div class="interview-question">
-                                <strong>
-                                    Question ${index + 1}
-                                </strong>
-                                <p>
-                                    ${escapeHtml(
-                                        typeof question === "string"
-                                            ? question
-                                            : question.question ||
-                                              question.text ||
-                                              ""
-                                    )}
-                                </p>
-                             </div>`
+                        .map(
+                            (question, index) => {
+
+                                const value =
+                                    typeof question ===
+                                    "string"
+                                        ? question
+                                        : (
+                                            question.question ||
+                                            question.text ||
+                                            ""
+                                        );
+
+
+                                return `
+
+                                    <div class="interview-question">
+
+                                        <strong>
+                                            Question ${index + 1}
+                                        </strong>
+
+                                        <p>
+                                            ${escapeHtml(
+                                                value
+                                            )}
+                                        </p>
+
+                                    </div>
+
+                                `;
+                            }
                         )
                         .join("");
+
             } else {
+
                 container.textContent =
-                    safeText(questions);
+                    text(questions);
             }
 
+
         } catch (error) {
+
             container.innerHTML = `
                 <div class="form-message error">
-                    ${escapeHtml(error.message)}
+                    ${escapeHtml(
+                        error.message
+                    )}
                 </div>
             `;
         }
     }
 
+
     /* ============================================================
-       AI INTERVIEW ASSISTANT
+       AI INTERVIEW
        ============================================================ */
 
-    function initAIInterviewAssistant() {
+    function initAIInterview() {
+
         const button =
             $("ai-interview-submit") ||
             $("btn-ai-interview") ||
             $("ask-ai-btn");
 
+
         const input =
             $("ai-interview-question") ||
             $("interview-question-input");
+
 
         const output =
             $("ai-interview-answer") ||
             $("ai-response") ||
             $("ai-interview-output");
 
-        if (!button || !input || !output) {
+
+        if (
+            !button ||
+            !input ||
+            !output
+        ) {
             return;
         }
+
 
         button.addEventListener(
             "click",
             async event => {
+
                 event.preventDefault();
+
 
                 const question =
                     input.value.trim();
 
+
                 if (!question) {
                     return;
                 }
+
 
                 setButtonLoading(
                     button,
@@ -2221,18 +3394,23 @@
                     "Ask AI"
                 );
 
+
                 try {
+
                     const result =
                         await apiRequest(
                             "ask_interview_ai",
                             {
                                 question,
+
                                 target_role:
                                     state.targetRole,
+
                                 target_company:
                                     state.targetCompany
                             }
                         );
+
 
                     output.textContent =
                         result.answer ||
@@ -2240,11 +3418,15 @@
                         result.message ||
                         "No response received.";
 
+
                 } catch (error) {
+
                     output.textContent =
                         error.message;
 
+
                 } finally {
+
                     setButtonLoading(
                         button,
                         false,
@@ -2255,38 +3437,122 @@
         );
     }
 
+
     /* ============================================================
-       CHARTS
+       ROADMAP / INTERVIEW BUTTONS
        ============================================================ */
 
-    function initCharts() {
-        /*
-         * Do not create fake statistics.
-         * Charts are only initialized if Chart.js exists
-         * and the page already contains chart canvases.
-         */
+    function initFeatureButtons() {
 
-        if (typeof Chart === "undefined") {
+        qsa(
+            "#roadmap-btn, " +
+            "[data-action='roadmap'], " +
+            ".roadmap-btn"
+        ).forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    loadRoadmap
+                );
+            }
+        );
+
+
+        qsa(
+            "#interview-btn, " +
+            "[data-action='interview'], " +
+            ".interview-btn"
+        ).forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    loadInterview
+                );
+            }
+        );
+    }
+
+
+    /* ============================================================
+       REMOVE OLD PREDEFINED TARGET CONTROLS
+       ============================================================ */
+
+    function removeOldTargetControls() {
+
+        const selectors = [
+
+            "#company-select",
+
+            "#companySelect",
+
+            "#role-select",
+
+            "#roleSelect",
+
+            "#benchmark-company",
+
+            "#benchmark-role",
+
+            "#benchmark-company-select",
+
+            "#benchmark-role-select"
+        ];
+
+
+        selectors.forEach(
+            selector => {
+
+                qsa(selector).forEach(
+                    element => {
+
+                        element.style.display =
+                            "none";
+                    }
+                );
+            }
+        );
+    }
+
+
+    /* ============================================================
+       LOAD EXISTING JOBS
+       ============================================================ */
+
+    function loadExistingJobs() {
+
+        if (!state.loggedIn) {
             return;
         }
 
-        qsa("canvas").forEach(canvas => {
-            if (canvas.dataset.sgpInitialized) {
-                return;
-            }
 
-            /*
-             * Leave charts to existing dashboard logic
-             * if they already have a Chart instance.
-             */
-        });
+        if (
+            Array.isArray(
+                APP.careerJobs
+            ) &&
+            APP.careerJobs.length
+        ) {
+
+            state.careerJobs =
+                normalizeJobs(
+                    APP.careerJobs
+                );
+
+
+            renderJobs(
+                state.careerJobs
+            );
+        }
     }
 
+
     /* ============================================================
-       DYNAMIC TARGET INITIALIZATION
+       INITIAL TARGET
        ============================================================ */
 
-    function initializeDynamicTarget() {
+    function initializeTarget() {
+
         state.targetCompany =
             APP.targetCompany || "";
 
@@ -2304,267 +3570,213 @@
             );
 
         state.atsScore =
-            Number(APP.atsScore || 0);
+            Number(
+                APP.atsScore || 0
+            );
 
-        if (APP.recommendedJob) {
+
+        if (
+            APP.recommendedJob
+        ) {
+
             state.recommendedJob =
                 normalizeJob(
                     APP.recommendedJob
                 );
         }
 
-        updateTargetLabels();
-        renderSkills();
-        renderATS();
-        renderTargetInfo();
 
-        if (state.recommendedJob) {
-            renderJobRecommendation(
+        updateTargetUI();
+
+        renderSkills();
+
+        renderATS();
+
+
+        if (
+            state.recommendedJob
+        ) {
+
+            renderRecommendation(
                 state.recommendedJob
             );
         }
     }
 
-    /* ============================================================
-       LOAD EXISTING CAREER JOBS
-       ============================================================ */
-
-    function loadExistingJobs() {
-        if (!state.loggedIn) return;
-
-        if (
-            Array.isArray(APP.careerJobs) &&
-            APP.careerJobs.length
-        ) {
-            state.careerJobs =
-                normalizeJobs(
-                    APP.careerJobs
-                );
-
-            renderJobResults(
-                state.careerJobs
-            );
-        }
-    }
 
     /* ============================================================
-       HIDE OLD PREDEFINED COMPANY/ROLE UI
+       SAFE INITIALIZER
        ============================================================ */
 
-    function hideLegacyTargetControls() {
-        /*
-         * Hide old company/role selectors so the system is
-         * completely dynamic.
-         */
+    function safeInit(
+        name,
+        callback
+    ) {
 
-        const selectors = [
-            "#company-select",
-            "#companySelect",
-            "#role-select",
-            "#roleSelect",
-            "#benchmark-company",
-            "#benchmark-role",
-            "#benchmark-company-select",
-            "#benchmark-role-select"
-        ];
-
-        selectors.forEach(selector => {
-            qsa(selector).forEach(element => {
-                element.style.display = "none";
-            });
-        });
-
-        /*
-         * Disable legacy selectors instead of letting them
-         * insert predefined values.
-         */
-        qsa("select").forEach(select => {
-            const id =
-                (select.id || "").toLowerCase();
-
-            if (
-                id.includes("company") ||
-                id.includes("role") ||
-                id.includes("benchmark")
-            ) {
-                select.innerHTML =
-                    "<option value=''>Select from career URL</option>";
-
-                select.value = "";
-                select.disabled = true;
-            }
-        });
-    }
-
-    /* ============================================================
-       EVENT BUTTONS
-       ============================================================ */
-
-    function initFeatureButtons() {
-        qsa(
-            "#roadmap-btn, [data-action='roadmap'], .roadmap-btn"
-        ).forEach(button => {
-            button.addEventListener(
-                "click",
-                loadRoadmap
-            );
-        });
-
-        qsa(
-            "#interview-btn, [data-action='interview'], .interview-btn"
-        ).forEach(button => {
-            button.addEventListener(
-                "click",
-                loadInterview
-            );
-        });
-    }
-
-    /* ============================================================
-       GLOBAL BOOT
-       ============================================================ */
-
-    function safeInit(name, fn) {
         try {
-            fn();
+
+            callback();
+
         } catch (error) {
+
             console.error(
-                "Skill Gap Predictor:",
-                name,
+                "Skill Gap Predictor - " +
+                name +
+                ":",
                 error
             );
         }
     }
 
+
+    /* ============================================================
+       START APPLICATION
+       ============================================================ */
+
     function boot() {
+
         /*
-         * Always remove loading screen first.
-         * This prevents the application from being stuck
-         * at "Loading Skill Gap Predictor".
+         * FIRST:
+         * Remove loading screen.
          */
+
         hideLoadingScreen();
 
+
+        /*
+         * Login/signup features must always load.
+         */
+
         safeInit(
-            "auth tabs",
+            "Auth Tabs",
             initAuthTabs
         );
 
         safeInit(
-            "login",
+            "Login",
             initLogin
         );
 
         safeInit(
-            "signup",
+            "Signup",
             initSignup
         );
 
         safeInit(
-            "password toggles",
+            "Password Toggle",
             initPasswordToggles
         );
 
         safeInit(
-            "theme",
+            "Theme",
             initThemeToggle
         );
 
+
+        /*
+         * Logged-in navigation.
+         */
+
         safeInit(
-            "navigation",
+            "Navigation",
             initNavigation
         );
 
         safeInit(
-            "mobile UI",
-            initMobileUI
+            "Mobile Menu",
+            initMobileMenu
         );
 
-        /*
-         * Login page MUST NOT initialize career URL.
-         */
+
         if (state.loggedIn) {
-            safeInit(
-                "career URL",
-                initDynamicCareerURL
-            );
+
+            /*
+             * ONLY logged-in users get Career URL.
+             */
 
             safeInit(
-                "resume upload",
+                "Career URL",
+                initCareerURL
+            );
+
+
+            safeInit(
+                "Resume Upload",
                 initResumeUpload
             );
 
-            safeInit(
-                "profile",
-                initProfileForm
-            );
 
             safeInit(
-                "features",
+                "Profile",
+                initProfile
+            );
+
+
+            safeInit(
+                "Features",
                 initFeatureButtons
             );
 
-            safeInit(
-                "dynamic target",
-                initializeDynamicTarget
-            );
 
             safeInit(
-                "existing jobs",
+                "AI Interview",
+                initAIInterview
+            );
+
+
+            safeInit(
+                "Target",
+                initializeTarget
+            );
+
+
+            safeInit(
+                "Existing Jobs",
                 loadExistingJobs
             );
 
-            safeInit(
-                "skills",
-                renderSkills
-            );
 
-            safeInit(
-                "ATS",
-                renderATS
-            );
-
-            safeInit(
-                "AI interview",
-                initAIInterviewAssistant
-            );
-
-            safeInit(
-                "charts",
-                initCharts
-            );
-
-            safeInit(
-                "legacy target controls",
-                hideLegacyTargetControls
-            );
         } else {
+
             /*
-             * Logged out:
-             * explicitly hide all career/dashboard controls.
+             * Logged-out page.
              */
+
             safeInit(
-                "login visibility",
-                controlLoginPageVisibility
+                "Login Page Cleanup",
+                hideCareerElementsWhenLoggedOut
             );
         }
 
+
         /*
-         * Final safety check.
+         * FINAL SAFETY:
+         * Never leave loading screen visible.
          */
+
         hideLoadingScreen();
     }
+
 
     /* ============================================================
        START
        ============================================================ */
 
-    if (document.readyState === "loading") {
+    if (
+        document.readyState ===
+        "loading"
+    ) {
+
         document.addEventListener(
             "DOMContentLoaded",
             boot,
-            { once: true }
+            {
+                once: true
+            }
         );
+
     } else {
+
         boot();
     }
 
