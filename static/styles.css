@@ -2639,3 +2639,259 @@ body.dark-mode .skill-tag.required {
         transition-duration: 0.01ms !important;
     }
 }
+/* ================================================================
+   APP MODALS / NOTIFICATIONS
+================================================================ */
+
+.app-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 99990;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    background: rgba(15, 23, 42, 0.55);
+
+    backdrop-filter: blur(6px);
+
+    opacity: 1;
+    visibility: visible;
+
+    transition:
+        opacity 0.22s ease,
+        visibility 0.22s ease;
+}
+
+.app-modal.hidden {
+    display: none !important;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.app-modal-card {
+    width: min(430px, 100%);
+
+    padding: 30px 28px;
+
+    text-align: center;
+
+    background: var(--surface);
+
+    border: 1px solid var(--border);
+    border-radius: 20px;
+
+    box-shadow: var(--shadow-lg);
+
+    transform: translateY(0) scale(1);
+
+    animation: modalCardIn 0.22s ease;
+}
+
+@keyframes modalCardIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.app-modal-icon {
+    width: 62px;
+    height: 62px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin: 0 auto 17px;
+
+    border-radius: 50%;
+
+    background: var(--primary-light);
+
+    color: var(--primary);
+
+    font-size: 29px;
+    font-weight: 900;
+}
+
+.app-modal-icon.success {
+    background: rgba(16, 185, 129, 0.13);
+    color: #059669;
+}
+
+.app-modal-icon.error {
+    background: rgba(239, 68, 68, 0.13);
+    color: #dc2626;
+}
+
+.app-modal-icon.info {
+    background: rgba(6, 182, 212, 0.13);
+    color: #0891b2;
+}
+
+body.dark-mode .app-modal-icon.success {
+    background: rgba(16, 185, 129, 0.16);
+    color: #6ee7b7;
+}
+
+body.dark-mode .app-modal-icon.error {
+    background: rgba(239, 68, 68, 0.16);
+    color: #fca5a5;
+}
+
+body.dark-mode .app-modal-icon.info {
+    background: rgba(6, 182, 212, 0.16);
+    color: #67e8f9;
+}
+
+.app-modal-title {
+    color: var(--text);
+
+    font-size: 20px;
+    font-weight: 850;
+
+    line-height: 1.3;
+}
+
+.app-modal-message {
+    margin-top: 9px;
+
+    color: var(--text-secondary);
+
+    font-size: 13px;
+    line-height: 1.65;
+}
+
+.app-modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+
+    margin-top: 23px;
+}
+
+.app-modal-actions .btn {
+    min-width: 110px;
+}
+
+.app-modal-loading .app-modal-icon {
+    animation: modalLoadingPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes modalLoadingPulse {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+
+/* ================================================================
+   CAREER SOURCE STATUS
+================================================================ */
+
+.career-source-success {
+    color: #059669 !important;
+}
+
+.career-source-error {
+    color: #dc2626 !important;
+}
+
+body.dark-mode .career-source-success {
+    color: #6ee7b7 !important;
+}
+
+body.dark-mode .career-source-error {
+    color: #fca5a5 !important;
+}
+
+
+/* ================================================================
+   LOADING BUTTON STATE
+================================================================ */
+
+.btn.is-loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.btn.is-loading::after {
+    content: "";
+
+    width: 15px;
+    height: 15px;
+
+    margin-left: 7px;
+
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+
+    border-radius: 50%;
+
+    animation: buttonSpin 0.7s linear infinite;
+}
+
+@keyframes buttonSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+/* ================================================================
+   DARK MODE COMPATIBILITY
+================================================================ */
+
+html.dark,
+body.dark {
+    color-scheme: dark;
+}
+
+html.dark body {
+    background: var(--bg);
+    color: var(--text);
+}
+
+
+/* ================================================================
+   MOBILE MODAL
+================================================================ */
+
+@media (max-width: 480px) {
+
+    .app-modal {
+        padding: 14px;
+    }
+
+    .app-modal-card {
+        padding: 25px 20px;
+        border-radius: 17px;
+    }
+
+    .app-modal-title {
+        font-size: 18px;
+    }
+
+    .app-modal-actions {
+        flex-direction: column;
+    }
+
+    .app-modal-actions .btn {
+        width: 100%;
+    }
+}
