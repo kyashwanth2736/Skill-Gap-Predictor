@@ -100,11 +100,9 @@ function callPythonBridge($action, $payload = [])
         __DIR__ . DIRECTORY_SEPARATOR . 'bridge.py';
 
     if (!file_exists($bridgePath)) {
-
         return [
             "status" => "error",
-            "message" =>
-                "Python bridge file was not found."
+            "message" => "Python bridge file was not found."
         ];
     }
 
@@ -116,11 +114,9 @@ function callPythonBridge($action, $payload = [])
         );
 
     if ($jsonInput === false) {
-
         return [
             "status" => "error",
-            "message" =>
-                "Unable to encode Python bridge input."
+            "message" => "Unable to encode Python bridge input."
         ];
     }
 
@@ -180,7 +176,6 @@ function callPythonBridge($action, $payload = [])
         }
 
         if (!empty($stderr)) {
-
             return [
                 "status" => "error",
                 "message" =>
@@ -217,11 +212,8 @@ function normalizeSkills($skills)
             );
 
         if (is_array($decoded)) {
-
             $skills = $decoded;
-
         } else {
-
             $skills =
                 preg_split(
                     '/[,;\n|]+/',
@@ -240,7 +232,6 @@ function normalizeSkills($skills)
     foreach ($skills as $skill) {
 
         if (is_array($skill)) {
-
             $skill =
                 $skill['name']
                 ?? $skill['skill']
@@ -677,7 +668,6 @@ function storeCareerJobs($jobs, $url = '')
         $jobs;
 
     if ($url !== '') {
-
         $_SESSION['career_url'] =
             trim($url);
     }
@@ -780,8 +770,7 @@ function httpGetPage($url, $timeout = 15)
             "success" => false,
             "body" => '',
             "message" =>
-                "HTTP " .
-                $httpCode
+                "HTTP " . $httpCode
         ];
     }
 
@@ -812,13 +801,16 @@ function makeAbsoluteUrl($baseUrl, $href)
         return '';
     }
 
+    $lowerHref =
+        strtolower($href);
+
     if (
         strpos(
-            strtolower($href),
+            $lowerHref,
             'javascript:'
         ) === 0 ||
         strpos(
-            strtolower($href),
+            $lowerHref,
             'mailto:'
         ) === 0 ||
         strpos(
@@ -1466,9 +1458,7 @@ function enrichJobDetails(
             $job['url']
             ?? '';
 
-        if (
-            $jobUrl === ''
-        ) {
+        if ($jobUrl === '') {
             continue;
         }
 
@@ -1516,19 +1506,13 @@ function enrichJobDetails(
         $detailHtml =
             $detail['body'];
 
-        /*
-         * First try JSON-LD because job detail pages
-         * often contain structured JobPosting data.
-         */
         $jsonJobs =
             extractJsonLdJobs(
                 $detailHtml,
                 $jobUrl
             );
 
-        if (
-            !empty($jsonJobs)
-        ) {
+        if (!empty($jsonJobs)) {
 
             $first =
                 $jsonJobs[0];
@@ -1578,10 +1562,6 @@ function enrichJobDetails(
             }
         }
 
-        /*
-         * If structured data did not provide the
-         * description, extract visible page text.
-         */
         if (
             empty(
                 $jobs[$index]['description']
@@ -1662,10 +1642,6 @@ function scrapeCareerPageFallback($url)
 
     $jobs = [];
 
-
-    /*
-     * JSON-LD jobs.
-     */
     $jsonJobs =
         extractJsonLdJobs(
             $html,
@@ -1681,10 +1657,6 @@ function scrapeCareerPageFallback($url)
             );
     }
 
-
-    /*
-     * DOM links.
-     */
     $domJobs =
         extractJobLinksWithDom(
             $html,
@@ -1701,13 +1673,6 @@ function scrapeCareerPageFallback($url)
             );
     }
 
-
-    /*
-     * Regex links.
-     *
-     * This also works when the PHP DOM extension
-     * is not installed on the server.
-     */
     $regexJobs =
         extractJobLinksWithRegex(
             $html,
@@ -1724,16 +1689,11 @@ function scrapeCareerPageFallback($url)
             );
     }
 
-
     $jobs =
         normalizeCareerJobs(
             $jobs
         );
 
-
-    /*
-     * Enrich individual job pages.
-     */
     if (!empty($jobs)) {
 
         $jobs =
@@ -1742,7 +1702,6 @@ function scrapeCareerPageFallback($url)
                 20
             );
     }
-
 
     return [
         "jobs" =>
@@ -1789,14 +1748,6 @@ function buildAmazonSearchUrl($url)
         $parts['path']
         ?? '';
 
-    /*
-     * Amazon location pages have paths similar to:
-     *
-     * /content/en/locations/india/bangalore
-     *
-     * The final location segment can be used by the
-     * Amazon job search system.
-     */
     $segments =
         array_values(
             array_filter(
@@ -1814,8 +1765,7 @@ function buildAmazonSearchUrl($url)
         return '';
     }
 
-    $locationSlug =
-        '';
+    $locationSlug = '';
 
     for (
         $i = count($segments) - 1;
@@ -1893,10 +1843,6 @@ function scrapeAmazonSearchPage($searchUrl)
 
     $jobs = [];
 
-
-    /*
-     * JSON-LD first.
-     */
     $jsonJobs =
         extractJsonLdJobs(
             $html,
@@ -1912,10 +1858,6 @@ function scrapeAmazonSearchPage($searchUrl)
             );
     }
 
-
-    /*
-     * DOM extraction.
-     */
     $domJobs =
         extractJobLinksWithDom(
             $html,
@@ -1932,10 +1874,6 @@ function scrapeAmazonSearchPage($searchUrl)
             );
     }
 
-
-    /*
-     * Regex extraction.
-     */
     $regexJobs =
         extractJobLinksWithRegex(
             $html,
@@ -1952,11 +1890,6 @@ function scrapeAmazonSearchPage($searchUrl)
             );
     }
 
-
-    /*
-     * Amazon job links can be present as escaped JSON
-     * strings inside page data. Search those as well.
-     */
     if (
         preg_match_all(
             '#https?://(?:www\.)?amazon\.jobs/[^"\']*/jobs/[^"\']+#i',
@@ -1999,19 +1932,11 @@ function scrapeAmazonSearchPage($searchUrl)
         }
     }
 
-
-    /*
-     * Remove duplicates.
-     */
     $jobs =
         normalizeCareerJobs(
             $jobs
         );
 
-
-    /*
-     * Enrich actual job pages.
-     */
     if (!empty($jobs)) {
 
         $jobs =
@@ -2020,7 +1945,6 @@ function scrapeAmazonSearchPage($searchUrl)
                 20
             );
     }
-
 
     return [
         "jobs" =>
@@ -2061,15 +1985,6 @@ function scrapeSourceSpecificCareerPage($url)
             $parts['host']
         );
 
-
-    /*
-     * Amazon location/content pages.
-     *
-     * This does NOT define a job or company target.
-     * It simply translates an Amazon location page
-     * into the site's job-search page so that actual
-     * current listings can be collected.
-     */
     if (
         strpos(
             $host,
@@ -2090,7 +2005,6 @@ function scrapeSourceSpecificCareerPage($url)
                 );
         }
     }
-
 
     return [
         "jobs" => [],
@@ -2435,6 +2349,13 @@ $action =
     $_GET['action']
     ?? ($_POST['action'] ?? '');
 
+$action =
+    strtolower(
+        trim(
+            (string)$action
+        )
+    );
+
 if ($action === '') {
 
     jsonResponse([
@@ -2443,6 +2364,24 @@ if ($action === '') {
             "Action parameter required."
     ], 400);
 }
+
+
+/* ============================================================
+   PUBLIC ACTIONS
+   ============================================================
+ *
+ * IMPORTANT:
+ *
+ * login
+ * signup
+ * register
+ * logout
+ *
+ * are handled BEFORE the authentication-required block.
+ *
+ * Therefore a new user can create an account without
+ * already being logged in.
+ */
 
 
 /* ============================================================
@@ -2466,6 +2405,10 @@ if ($action === 'login') {
 
         jsonResponse([
             "status" => "error",
+
+            "error_code" =>
+                "VALIDATION_ERROR",
+
             "message" =>
                 "Email and password are required."
         ], 400);
@@ -2487,26 +2430,36 @@ if ($action === 'login') {
         $_SESSION['user'] =
             $authRes['user'];
 
-        $_SESSION['extracted_skills'] = [];
+        $_SESSION['extracted_skills'] =
+            [];
 
-        $_SESSION['ats_score'] = null;
+        $_SESSION['ats_score'] =
+            null;
 
-        $_SESSION['parsed_resume'] = [];
+        $_SESSION['parsed_resume'] =
+            [];
 
-        $_SESSION['career_jobs'] = [];
+        $_SESSION['career_jobs'] =
+            [];
 
-        $_SESSION['career_url'] = '';
+        $_SESSION['career_url'] =
+            '';
 
-        $_SESSION['target_company'] = '';
+        $_SESSION['target_company'] =
+            '';
 
-        $_SESSION['target_role'] = '';
+        $_SESSION['target_role'] =
+            '';
 
-        $_SESSION['required_skills'] = [];
+        $_SESSION['required_skills'] =
+            [];
 
-        $_SESSION['recommended_job'] = null;
+        $_SESSION['recommended_job'] =
+            null;
 
         jsonResponse([
-            "status" => "success",
+            "status" =>
+                "success",
 
             "message" =>
                 "Login successful.",
@@ -2523,7 +2476,8 @@ if ($action === 'login') {
     }
 
     jsonResponse([
-        "status" => "error",
+        "status" =>
+            "error",
 
         "error_code" =>
             "INVALID_CREDENTIALS",
@@ -2536,10 +2490,22 @@ if ($action === 'login') {
 
 
 /* ============================================================
-   SIGNUP
-   ============================================================ */
+   SIGNUP / REGISTER
+   ============================================================
+ *
+ * Both action names are accepted:
+ *
+ * api.php?action=signup
+ * api.php?action=register
+ *
+ * This prevents frontend naming mismatch from causing the
+ * protected authentication block to run.
+ */
 
-if ($action === 'signup') {
+if (
+    $action === 'signup' ||
+    $action === 'register'
+) {
 
     $name =
         trim(
@@ -2583,6 +2549,10 @@ if ($action === 'signup') {
         );
 
 
+    /* --------------------------------------------------------
+       REQUIRED FIELDS
+       -------------------------------------------------------- */
+
     if (
         $name === '' ||
         $email === '' ||
@@ -2590,7 +2560,8 @@ if ($action === 'signup') {
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "error_code" =>
                 "VALIDATION_ERROR",
@@ -2601,6 +2572,10 @@ if ($action === 'signup') {
     }
 
 
+    /* --------------------------------------------------------
+       EMAIL VALIDATION
+       -------------------------------------------------------- */
+
     if (
         !filter_var(
             $email,
@@ -2609,7 +2584,8 @@ if ($action === 'signup') {
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "error_code" =>
                 "INVALID_EMAIL",
@@ -2620,12 +2596,17 @@ if ($action === 'signup') {
     }
 
 
+    /* --------------------------------------------------------
+       PASSWORD VALIDATION
+       -------------------------------------------------------- */
+
     if (
         strlen($password) < 6
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "error_code" =>
                 "WEAK_PASSWORD",
@@ -2637,10 +2618,12 @@ if ($action === 'signup') {
 
 
     /*
-     * Company and role remain empty during registration.
-     * They are populated only from actual career-page
-     * analysis and recommendation.
+     * Company and role intentionally remain empty.
+     *
+     * They will be populated only after the user provides
+     * a career URL and actual jobs are discovered.
      */
+
     $regRes =
         registerUser(
             $name,
@@ -2656,16 +2639,21 @@ if ($action === 'signup') {
         );
 
 
+    /* --------------------------------------------------------
+       ACCOUNT CREATED
+       -------------------------------------------------------- */
+
     if (
         isset($regRes['success']) &&
         $regRes['success']
     ) {
 
         jsonResponse([
-            "status" => "success",
+            "status" =>
+                "success",
 
-            "message" =>
-                "Account registered successfully.",
+            "success" =>
+                true,
 
             "registered" =>
                 true,
@@ -2673,15 +2661,25 @@ if ($action === 'signup') {
             "accountCreated" =>
                 true,
 
+            "error_code" =>
+                "ACCOUNT_CREATED",
+
+            "message" =>
+                "Account registered successfully.",
+
             "redirect" =>
-                "login"
-        ]);
+                "login",
+
+            "email" =>
+                $email
+        ], 200);
     }
 
 
-    /*
-     * Duplicate account detection.
-     */
+    /* --------------------------------------------------------
+       DUPLICATE ACCOUNT DETECTION
+       -------------------------------------------------------- */
+
     $registrationMessage =
         strtolower(
             trim(
@@ -2706,30 +2704,25 @@ if ($action === 'signup') {
             'duplicate'
         ) !== false ||
 
-        (
-            strpos(
-                $registrationMessage,
-                'email'
-            ) !== false &&
+        strpos(
+            $registrationMessage,
+            'taken'
+        ) !== false ||
 
-            (
-                strpos(
-                    $registrationMessage,
-                    'taken'
-                ) !== false ||
-
-                strpos(
-                    $registrationMessage,
-                    'registered'
-                ) !== false
-            )
-        );
+        strpos(
+            $registrationMessage,
+            'registered'
+        ) !== false;
 
 
     if ($duplicate) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
+
+            "success" =>
+                false,
 
             "error_code" =>
                 "ACCOUNT_EXISTS",
@@ -2741,13 +2734,24 @@ if ($action === 'signup') {
                 "An account with this email already exists. Please log in instead.",
 
             "redirect" =>
-                "login"
+                "login",
+
+            "email" =>
+                $email
         ], 409);
     }
 
 
+    /* --------------------------------------------------------
+       OTHER REGISTRATION ERROR
+       -------------------------------------------------------- */
+
     jsonResponse([
-        "status" => "error",
+        "status" =>
+            "error",
+
+        "success" =>
+            false,
 
         "error_code" =>
             "REGISTRATION_FAILED",
@@ -2793,7 +2797,8 @@ if ($action === 'logout') {
     session_destroy();
 
     jsonResponse([
-        "status" => "success",
+        "status" =>
+            "success",
 
         "message" =>
             "Logged out successfully.",
@@ -2806,16 +2811,28 @@ if ($action === 'logout') {
 
 /* ============================================================
    AUTHENTICATION REQUIRED
-   ============================================================ */
+   ============================================================
+ *
+ * Everything below this point requires an authenticated user.
+ *
+ * signup/register/login/logout have already been handled above.
+ */
 
 if (
     !isset(
+        $_SESSION['user']
+    ) ||
+    !is_array(
         $_SESSION['user']
     )
 ) {
 
     jsonResponse([
-        "status" => "error",
+        "status" =>
+            "error",
+
+        "error_code" =>
+            "UNAUTHORIZED",
 
         "message" =>
             "Unauthorized access. Please log in.",
@@ -2872,7 +2889,6 @@ if ($action === 'update_profile') {
             )
         );
 
-
     $company =
         array_key_exists(
             'target_company',
@@ -2883,7 +2899,6 @@ if ($action === 'update_profile') {
             )
             : '';
 
-
     $role =
         array_key_exists(
             'target_role',
@@ -2893,7 +2908,6 @@ if ($action === 'update_profile') {
                 $_POST['target_role']
             )
             : '';
-
 
     $linkedin =
         trim(
@@ -2913,7 +2927,6 @@ if ($action === 'update_profile') {
             )
         );
 
-
     if (
         !array_key_exists(
             'target_company',
@@ -2926,7 +2939,6 @@ if ($action === 'update_profile') {
             ?? '';
     }
 
-
     if (
         !array_key_exists(
             'target_role',
@@ -2938,7 +2950,6 @@ if ($action === 'update_profile') {
             $current_user['target_role']
             ?? '';
     }
-
 
     $ok =
         updateStudentProfile(
@@ -2953,7 +2964,6 @@ if ($action === 'update_profile') {
             $github
         );
 
-
     if ($ok) {
 
         $_SESSION['user'] =
@@ -2962,7 +2972,8 @@ if ($action === 'update_profile') {
             );
 
         jsonResponse([
-            "status" => "success",
+            "status" =>
+                "success",
 
             "message" =>
                 "Profile updated successfully.",
@@ -2972,9 +2983,9 @@ if ($action === 'update_profile') {
         ]);
     }
 
-
     jsonResponse([
-        "status" => "error",
+        "status" =>
+            "error",
 
         "message" =>
             "Failed to update profile."
@@ -2995,7 +3006,6 @@ if ($action === 'update_skills') {
 
     $_SESSION['extracted_skills'] =
         $skills;
-
 
     $recommendation = null;
 
@@ -3021,9 +3031,9 @@ if ($action === 'update_skills') {
         }
     }
 
-
     jsonResponse([
-        "status" => "success",
+        "status" =>
+            "success",
 
         "skills" =>
             $skills,
@@ -3049,17 +3059,16 @@ if ($action === 'upload_resume') {
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "Please select a valid resume file."
         ], 400);
     }
 
-
     $file =
         $_FILES['resume_file'];
-
 
     $extension =
         strtolower(
@@ -3068,7 +3077,6 @@ if ($action === 'upload_resume') {
                 PATHINFO_EXTENSION
             )
         );
-
 
     if (
         !in_array(
@@ -3083,19 +3091,15 @@ if ($action === 'upload_resume') {
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "Unsupported file type. Please upload PDF, DOCX or TXT."
         ], 400);
     }
 
-
-    /*
-     * Prefer persistent Render storage.
-     */
-    $baseUploadDir =
-        '';
+    $baseUploadDir = '';
 
     if (
         is_dir('/var/data') &&
@@ -3111,7 +3115,6 @@ if ($action === 'upload_resume') {
             sys_get_temp_dir();
     }
 
-
     $uploadDir =
         rtrim(
             $baseUploadDir,
@@ -3120,7 +3123,6 @@ if ($action === 'upload_resume') {
         DIRECTORY_SEPARATOR .
         'skill_gap_predictor_uploads' .
         DIRECTORY_SEPARATOR;
-
 
     if (!is_dir($uploadDir)) {
 
@@ -3131,20 +3133,19 @@ if ($action === 'upload_resume') {
         );
     }
 
-
     if (
         !is_dir($uploadDir) ||
         !is_writable($uploadDir)
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "Resume storage directory is not writable."
         ], 500);
     }
-
 
     $safeName =
         preg_replace(
@@ -3155,7 +3156,6 @@ if ($action === 'upload_resume') {
             )
         );
 
-
     $targetPath =
         $uploadDir .
         uniqid(
@@ -3165,7 +3165,6 @@ if ($action === 'upload_resume') {
         '_' .
         $safeName;
 
-
     if (
         !move_uploaded_file(
             $file['tmp_name'],
@@ -3174,13 +3173,13 @@ if ($action === 'upload_resume') {
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "Unable to store the uploaded resume."
         ], 500);
     }
-
 
     $parseRes =
         callPythonBridge(
@@ -3193,7 +3192,6 @@ if ($action === 'upload_resume') {
                     $file['name']
             ]
         );
-
 
     if (
         !isset(
@@ -3211,7 +3209,8 @@ if ($action === 'upload_resume') {
             is_array($parseRes)
                 ? $parseRes
                 : [
-                    "status" => "error",
+                    "status" =>
+                        "error",
 
                     "message" =>
                         "Resume parsing failed."
@@ -3220,18 +3219,15 @@ if ($action === 'upload_resume') {
         );
     }
 
-
     $_SESSION['parsed_resume'] =
         $parseRes['parsed_resume']
         ?? [];
-
 
     $_SESSION['extracted_skills'] =
         normalizeSkills(
             $parseRes['extracted_skills']
             ?? []
         );
-
 
     $_SESSION['ats_score'] =
         isset(
@@ -3244,11 +3240,9 @@ if ($action === 'upload_resume') {
                 $parseRes['ats_score']
             : null;
 
-
     $contact =
         $_SESSION['parsed_resume']['contact_info']
         ?? [];
-
 
     $linkedin =
         trim(
@@ -3256,13 +3250,11 @@ if ($action === 'upload_resume') {
             ?? ''
         );
 
-
     $github =
         trim(
             $contact['github']
             ?? ''
         );
-
 
     if ($linkedin !== '') {
 
@@ -3270,13 +3262,11 @@ if ($action === 'upload_resume') {
             $linkedin;
     }
 
-
     if ($github !== '') {
 
         $_SESSION['user']['github'] =
             $github;
     }
-
 
     $recommendation = null;
 
@@ -3304,7 +3294,6 @@ if ($action === 'upload_resume') {
         }
     }
 
-
     $requiredSkills =
         normalizeSkills(
             $_POST['required_skills']
@@ -3314,10 +3303,8 @@ if ($action === 'upload_resume') {
             )
         );
 
-
     $_SESSION['required_skills'] =
         $requiredSkills;
-
 
     $targetCompany =
         trim(
@@ -3328,7 +3315,6 @@ if ($action === 'upload_resume') {
             )
         );
 
-
     $targetRole =
         trim(
             $_POST['target_role']
@@ -3337,7 +3323,6 @@ if ($action === 'upload_resume') {
                 ?? ''
             )
         );
-
 
     if (
         $recommendation === null
@@ -3349,7 +3334,6 @@ if ($action === 'upload_resume') {
         $_SESSION['target_role'] =
             $targetRole;
     }
-
 
     if (
         $recommendation !== null
@@ -3373,9 +3357,7 @@ if ($action === 'upload_resume') {
             ?? '';
     }
 
-
     $metrics = [];
-
 
     if (
         !empty($requiredSkills)
@@ -3406,14 +3388,12 @@ if ($action === 'upload_resume') {
                 ]
             );
 
-
         if (
             !is_array($metrics)
         ) {
             $metrics = [];
         }
     }
-
 
     if (
         !empty($requiredSkills)
@@ -3441,14 +3421,13 @@ if ($action === 'upload_resume') {
         );
     }
 
-
     @unlink(
         $targetPath
     );
 
-
     jsonResponse([
-        "status" => "success",
+        "status" =>
+            "success",
 
         "message" =>
             "Resume parsed successfully.",
@@ -3503,7 +3482,6 @@ if ($action === 'load_sample') {
             ]
         );
 
-
     if (
         isset(
             $sampleRes['status']
@@ -3516,18 +3494,15 @@ if ($action === 'load_sample') {
             $sampleRes['parsed_resume']
             ?? [];
 
-
         $_SESSION['extracted_skills'] =
             normalizeSkills(
                 $sampleRes['extracted_skills']
                 ?? []
             );
 
-
         $_SESSION['ats_score'] =
             $sampleRes['ats_score']
             ?? null;
-
 
         $recommendation = null;
 
@@ -3557,9 +3532,9 @@ if ($action === 'load_sample') {
             }
         }
 
-
         jsonResponse([
-            "status" => "success",
+            "status" =>
+                "success",
 
             "data" =>
                 $sampleRes,
@@ -3568,7 +3543,6 @@ if ($action === 'load_sample') {
                 $recommendation
         ]);
     }
-
 
     jsonResponse(
         $sampleRes
@@ -3587,17 +3561,16 @@ if ($action === 'scrape_url') {
             $_POST['url'] ?? ''
         );
 
-
     if ($url === '') {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "Please enter a career URL."
         ], 400);
     }
-
 
     if (
         !filter_var(
@@ -3607,13 +3580,13 @@ if ($action === 'scrape_url') {
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "Please enter a valid career URL."
         ], 400);
     }
-
 
     $scheme =
         strtolower(
@@ -3622,7 +3595,6 @@ if ($action === 'scrape_url') {
                 PHP_URL_SCHEME
             ) ?? ''
         );
-
 
     if (
         !in_array(
@@ -3636,17 +3608,14 @@ if ($action === 'scrape_url') {
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "Only HTTP and HTTPS career URLs are supported."
         ], 400);
     }
 
-
-    /*
-     * Always reset the previous career source.
-     */
     $_SESSION['career_jobs'] =
         [];
 
@@ -3666,11 +3635,9 @@ if ($action === 'scrape_url') {
         [];
 
 
-    /*
-     * --------------------------------------------------------
-     * FIRST: PYTHON SCRAPER
-     * --------------------------------------------------------
-     */
+    /* --------------------------------------------------------
+       FIRST: PYTHON SCRAPER
+       -------------------------------------------------------- */
 
     $pythonRes =
         callPythonBridge(
@@ -3681,9 +3648,7 @@ if ($action === 'scrape_url') {
             ]
         );
 
-
     $jobs = [];
-
 
     if (
         is_array($pythonRes)
@@ -3696,14 +3661,11 @@ if ($action === 'scrape_url') {
     }
 
 
-    /*
-     * --------------------------------------------------------
-     * SECOND: GENERIC PHP FALLBACK
-     * --------------------------------------------------------
-     */
+    /* --------------------------------------------------------
+       SECOND: GENERIC PHP FALLBACK
+       -------------------------------------------------------- */
 
     $scraperMessages = [];
-
 
     if (
         empty($jobs)
@@ -3736,15 +3698,9 @@ if ($action === 'scrape_url') {
     }
 
 
-    /*
-     * --------------------------------------------------------
-     * THIRD: SOURCE-SPECIFIC FALLBACK
-     * --------------------------------------------------------
-     *
-     * This is especially important for career sites
-     * where a location page is separate from the actual
-     * job-search/listing page.
-     */
+    /* --------------------------------------------------------
+       THIRD: SOURCE-SPECIFIC FALLBACK
+       -------------------------------------------------------- */
 
     if (
         empty($jobs)
@@ -3777,32 +3733,22 @@ if ($action === 'scrape_url') {
     }
 
 
-    /*
-     * Final normalization.
-     */
     $jobs =
         normalizeCareerJobs(
             $jobs
         );
 
-
-    /*
-     * Store actual dynamically discovered jobs.
-     */
     storeCareerJobs(
         $jobs,
         $url
     );
 
 
-    /*
-     * --------------------------------------------------------
-     * DYNAMIC RECOMMENDATION
-     * --------------------------------------------------------
-     */
+    /* --------------------------------------------------------
+       DYNAMIC RECOMMENDATION
+       -------------------------------------------------------- */
 
     $recommendation = null;
-
 
     if (
         !empty(
@@ -3820,7 +3766,6 @@ if ($action === 'scrape_url') {
                 $_SESSION['extracted_skills']
             );
 
-
         if (
             $recommendation !== null
         ) {
@@ -3832,11 +3777,9 @@ if ($action === 'scrape_url') {
     }
 
 
-    /*
-     * --------------------------------------------------------
-     * ZERO RESULTS
-     * --------------------------------------------------------
-     */
+    /* --------------------------------------------------------
+       ZERO RESULTS
+       -------------------------------------------------------- */
 
     if (
         empty(
@@ -3852,7 +3795,6 @@ if ($action === 'scrape_url') {
                 )
                 : '';
 
-
         jsonResponse([
             "status" =>
                 "success",
@@ -3864,6 +3806,9 @@ if ($action === 'scrape_url') {
                 $_SESSION['career_url'],
 
             "jobs" =>
+                [],
+
+            "career_jobs" =>
                 [],
 
             "job_count" =>
@@ -3881,17 +3826,21 @@ if ($action === 'scrape_url') {
     }
 
 
-    /*
-     * Successful result.
-     */
+    /* --------------------------------------------------------
+       SUCCESSFUL RESULT
+       -------------------------------------------------------- */
+
+    $jobCount =
+        count(
+            $_SESSION['career_jobs']
+        );
+
     jsonResponse([
         "status" =>
             "success",
 
         "message" =>
-            count(
-                $_SESSION['career_jobs']
-            ) .
+            $jobCount .
             " job(s) found.",
 
         "career_url" =>
@@ -3900,10 +3849,11 @@ if ($action === 'scrape_url') {
         "jobs" =>
             $_SESSION['career_jobs'],
 
+        "career_jobs" =>
+            $_SESSION['career_jobs'],
+
         "job_count" =>
-            count(
-                $_SESSION['career_jobs']
-            ),
+            $jobCount,
 
         "recommendation" =>
             $recommendation
@@ -3921,37 +3871,35 @@ if ($action === 'recommend_job') {
         $_SESSION['career_jobs']
         ?? [];
 
-
     $resumeSkills =
         $_SESSION['extracted_skills']
         ?? [];
-
 
     if (
         empty($jobs)
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "No jobs have been loaded. Enter a career URL first."
         ], 400);
     }
 
-
     if (
         empty($resumeSkills)
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "Please upload your resume before calculating the best matching role."
         ], 400);
     }
-
 
     $recommendation =
         calculateLocalJobRecommendation(
@@ -3959,27 +3907,26 @@ if ($action === 'recommend_job') {
             $resumeSkills
         );
 
-
     if (
         $recommendation === null
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "The available jobs do not contain enough skill information for matching."
         ], 400);
     }
 
-
     saveDynamicRecommendation(
         $recommendation
     );
 
-
     jsonResponse([
-        "status" => "success",
+        "status" =>
+            "success",
 
         "recommendation" =>
             $recommendation
@@ -4002,7 +3949,6 @@ if ($action === 'get_metrics') {
             )
         );
 
-
     $role =
         trim(
             $_POST['target_role']
@@ -4011,7 +3957,6 @@ if ($action === 'get_metrics') {
                 ?? ''
             )
         );
-
 
     $requiredSkills =
         normalizeSkills(
@@ -4022,32 +3967,31 @@ if ($action === 'get_metrics') {
             )
         );
 
-
     if (
         empty($role)
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "No job role has been selected."
         ], 400);
     }
 
-
     if (
         empty($requiredSkills)
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "No job requirements are available. Please enter a career URL and select a job."
         ], 400);
     }
-
 
     $_SESSION['target_company'] =
         $company;
@@ -4057,7 +4001,6 @@ if ($action === 'get_metrics') {
 
     $_SESSION['required_skills'] =
         $requiredSkills;
-
 
     $metrics =
         callPythonBridge(
@@ -4086,18 +4029,15 @@ if ($action === 'get_metrics') {
             ]
         );
 
-
     if (
         !is_array($metrics)
     ) {
         $metrics = [];
     }
 
-
     $metrics['ats_score'] =
         $_SESSION['ats_score']
         ?? null;
-
 
     $metrics['matched_skills'] =
         normalizeSkills(
@@ -4105,13 +4045,11 @@ if ($action === 'get_metrics') {
             ?? []
         );
 
-
     $metrics['missing_skills'] =
         normalizeSkills(
             $metrics['missing_skills']
             ?? []
         );
-
 
     jsonResponse(
         $metrics
@@ -4129,24 +4067,22 @@ if ($action === 'rank_jobs') {
         $_POST['domain_filter']
         ?? 'All Domains';
 
-
     $careerJobs =
         $_SESSION['career_jobs']
         ?? [];
-
 
     if (
         empty($careerJobs)
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "No career jobs available. Please enter a career URL first."
         ], 400);
     }
-
 
     $res =
         callPythonBridge(
@@ -4164,28 +4100,25 @@ if ($action === 'rank_jobs') {
             ]
         );
 
-
     $pythonJobs =
         findJobsInResponse(
             $res
         );
-
 
     if (
         !empty($pythonJobs)
     ) {
 
         jsonResponse([
-            "status" => "success",
+            "status" =>
+                "success",
 
             "jobs" =>
                 $pythonJobs
         ]);
     }
 
-
     $ranked = [];
-
 
     foreach (
         $careerJobs
@@ -4199,7 +4132,6 @@ if ($action === 'rank_jobs') {
                 ?? []
             );
 
-
         if (
             $recommendation !== null
         ) {
@@ -4208,7 +4140,6 @@ if ($action === 'rank_jobs') {
                 $recommendation;
         }
     }
-
 
     usort(
         $ranked,
@@ -4232,9 +4163,9 @@ if ($action === 'rank_jobs') {
         }
     );
 
-
     jsonResponse([
-        "status" => "success",
+        "status" =>
+            "success",
 
         "jobs" =>
             $ranked
@@ -4254,7 +4185,6 @@ if ($action === 'get_roadmap') {
             ?? []
         );
 
-
     $targetRole =
         trim(
             $_POST['target_role']
@@ -4263,7 +4193,6 @@ if ($action === 'get_roadmap') {
                 ?? ''
             )
         );
-
 
     $targetCompany =
         trim(
@@ -4274,19 +4203,18 @@ if ($action === 'get_roadmap') {
             )
         );
 
-
     if (
         $targetRole === ''
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "No target job role has been selected."
         ], 400);
     }
-
 
     $res =
         callPythonBridge(
@@ -4302,7 +4230,6 @@ if ($action === 'get_roadmap') {
                     $targetCompany
             ]
         );
-
 
     jsonResponse(
         $res
@@ -4322,13 +4249,11 @@ if ($action === 'get_interview') {
             ?? []
         );
 
-
     $missing =
         normalizeSkills(
             $_POST['missing_skills']
             ?? []
         );
-
 
     $targetRole =
         trim(
@@ -4339,19 +4264,18 @@ if ($action === 'get_interview') {
             )
         );
 
-
     if (
         $targetRole === ''
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "No target job role has been selected."
         ], 400);
     }
-
 
     $res =
         callPythonBridge(
@@ -4367,7 +4291,6 @@ if ($action === 'get_interview') {
                     $missing
             ]
         );
-
 
     jsonResponse(
         $res
@@ -4386,7 +4309,6 @@ if ($action === 'ask_interview_ai') {
             $_POST['prompt'] ?? ''
         );
 
-
     $targetRole =
         trim(
             $_POST['target_role']
@@ -4395,7 +4317,6 @@ if ($action === 'ask_interview_ai') {
                 ?? ''
             )
         );
-
 
     $targetCompany =
         trim(
@@ -4406,19 +4327,18 @@ if ($action === 'ask_interview_ai') {
             )
         );
 
-
     if (
         $targetRole === ''
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "No target job role has been selected."
         ], 400);
     }
-
 
     $res =
         callPythonBridge(
@@ -4434,7 +4354,6 @@ if ($action === 'ask_interview_ai') {
                     $targetCompany
             ]
         );
-
 
     jsonResponse(
         $res
@@ -4454,13 +4373,11 @@ if ($action === 'evaluate_answer') {
             ?? ''
         );
 
-
     $userAnswer =
         trim(
             $_POST['user_answer']
             ?? ''
         );
-
 
     $targetRole =
         trim(
@@ -4471,19 +4388,18 @@ if ($action === 'evaluate_answer') {
             )
         );
 
-
     if (
         $targetRole === ''
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "No target job role has been selected."
         ], 400);
     }
-
 
     $res =
         callPythonBridge(
@@ -4499,7 +4415,6 @@ if ($action === 'evaluate_answer') {
                     $targetRole
             ]
         );
-
 
     jsonResponse(
         $res
@@ -4522,7 +4437,6 @@ if ($action === 'download_pdf') {
             )
         );
 
-
     $targetRole =
         trim(
             $_POST['target_role']
@@ -4531,7 +4445,6 @@ if ($action === 'download_pdf') {
                 ?? ''
             )
         );
-
 
     $requiredSkills =
         normalizeSkills(
@@ -4542,32 +4455,31 @@ if ($action === 'download_pdf') {
             )
         );
 
-
     if (
         $targetRole === ''
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "No target job role is available."
         ], 400);
     }
 
-
     if (
         empty($requiredSkills)
     ) {
 
         jsonResponse([
-            "status" => "error",
+            "status" =>
+                "error",
 
             "message" =>
                 "No job requirements are available for the report."
         ], 400);
     }
-
 
     $metrics =
         callPythonBridge(
@@ -4596,13 +4508,11 @@ if ($action === 'download_pdf') {
             ]
         );
 
-
     if (
         !is_array($metrics)
     ) {
         $metrics = [];
     }
-
 
     $roadmapRes =
         callPythonBridge(
@@ -4620,9 +4530,7 @@ if ($action === 'download_pdf') {
             ]
         );
 
-
     $recommendations = [];
-
 
     if (
         !empty(
@@ -4633,7 +4541,6 @@ if ($action === 'download_pdf') {
         $firstMissing =
             $metrics['missing_skills'][0]
             ?? '';
-
 
         if (
             $firstMissing !== ''
@@ -4646,14 +4553,11 @@ if ($action === 'download_pdf') {
         }
     }
 
-
     $recommendations[] =
         "Tailor the resume to the selected job requirements.";
 
-
     $recommendations[] =
         "Use measurable results in project descriptions.";
-
 
     $pdfRes =
         callPythonBridge(
@@ -4706,7 +4610,6 @@ if ($action === 'download_pdf') {
             ]
         );
 
-
     if (
         !empty(
             $pdfRes['pdf_b64']
@@ -4719,29 +4622,26 @@ if ($action === 'download_pdf') {
                 true
             );
 
-
         if (
             $pdfData === false
         ) {
 
             jsonResponse([
-                "status" => "error",
+                "status" =>
+                    "error",
 
                 "message" =>
                     "Generated PDF data is invalid."
             ], 500);
         }
 
-
         header_remove(
             'Content-Type'
         );
 
-
         header(
             'Content-Type: application/pdf'
         );
-
 
         $safeName =
             preg_replace(
@@ -4751,28 +4651,25 @@ if ($action === 'download_pdf') {
                 ?? 'Student'
             );
 
-
         header(
             'Content-Disposition: attachment; filename="Progress_Report_' .
             $safeName .
             '.pdf"'
         );
 
-
         header(
             'Content-Length: ' .
             strlen($pdfData)
         );
-
 
         echo $pdfData;
 
         exit;
     }
 
-
     jsonResponse([
-        "status" => "error",
+        "status" =>
+            "error",
 
         "message" =>
             "PDF generation failed."
@@ -4785,7 +4682,8 @@ if ($action === 'download_pdf') {
    ============================================================ */
 
 jsonResponse([
-    "status" => "error",
+    "status" =>
+        "error",
 
     "message" =>
         "Invalid API action: " .
